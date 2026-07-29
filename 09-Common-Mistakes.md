@@ -2,18 +2,18 @@
 title: "Common mistakes and misunderstandings"
 chapter: "09"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:14:30-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, common-mistakes, jsi, turbomodules, fabric, codegen, bridgeless]
 audit:
   status: "verified"
@@ -23,20 +23,21 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:14:30-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). See _verification/chapters/09-common-mistakes/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 10: Common Mistakes and Misunderstandings
 
 The New Architecture introduces powerful concepts, but also new ways for things to go wrong. Understanding common pitfalls can save significant debugging time. This chapter outlines frequent mistakes and misunderstandings grouped by component.
 
-(Version context: starting with v0.76, Fabric, TurboModules, and Bridgeless are the defaults. The mistakes below assume an app on v0.76 or newer. On the v0.86 line, the interop paths described below are still present but increasingly behind feature flags.)
+(Version context: starting with v0.76, Fabric, TurboModules, and Bridgeless are the defaults. The mistakes below assume an app on v0.76 or newer. On the v0.87 line, TurboModules are always on, opt-out is long gone (since 0.82), and the interop paths described below are still present but increasingly behind `RCT_REMOVE_LEGACY_*` compile gates.)
 
 ## General Misunderstandings
 
 **Mistake: Assuming the New Architecture automatically makes existing code faster.**
 
--   **Why it's a mistake:** Simply enabling the New Architecture flag does not optimize legacy components. An old, Bridge-based native module will still communicate via a compatibility layer. The performance benefits are only realized when a module is migrated to a TurboModule or a component to a Fabric Component.
--   **How to avoid:** Understand that performance gains require active migration of your native code to use the new, JSI-based APIs. The Android-side compatibility shim is the `InteropModuleRegistry`, gated behind the `useFabricInterop()` feature flag. It is annotated `@InteropLegacyArchitecture` in the source, which is a strong signal that this is a migration crutch rather than a long-term performance path.[^4]
+-   **Why it's a mistake:** Shipping on the New Architecture (the only option on RN ≥ 0.82) does not by itself optimize legacy components. An old, Bridge-based native module will still communicate via a compatibility layer. The performance benefits are only realized when a module is migrated to a TurboModule or a component to a Fabric Component.
+-   **How to avoid:** Understand that performance gains require active migration of your native code to use the new, JSI-based APIs. The Android-side compatibility shim is the `InteropModuleRegistry`, gated behind the `useFabricInterop()` feature flag. It is annotated `@InteropLegacyArchitecture` in the source, which is a strong signal that this is a migration crutch rather than a long-term performance path — and on 0.87 the C++/platform interop surfaces are themselves compile-optional behind `RCT_REMOVE_LEGACY_*_INTEROP`.[^4]
 
 **Mistake: Ignoring third-party library compatibility.**
 

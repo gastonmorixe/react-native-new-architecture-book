@@ -2,18 +2,18 @@
 title: "Case Study - react-native-vision-camera"
 chapter: "12"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T19:59:32-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, case-study, vision-camera, jsi, host-object, frame-processor, worklets, nitro, third-party]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:51-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db) and Vision Camera v4.7.2 / v5.0.x. See _verification/chapters/12-vision-camera/report.md."
   - "2026-05-23T19:59:32-0400 | Recheck pass against VC clone HEAD 5a07d7ae (v5.0.10+7). Repo restructured to packages/ monorepo since v1 audit; v4 paths still resolve via `git show v4.7.2:...`. Fixed three v1 footnote bugs (worklets-plugin docs path, Android FrameHostObject.cpp:22 line number, TurboModule TODO count 7-not-4). Added V5 PR commit pin (30a8b5de) and v5 Frame.nitro.ts citation. See _verification/recheck/vc/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 13: Case Study - `react-native-vision-camera`
@@ -44,6 +45,8 @@ The v4 line is the version everyone migrating to Fabric and Bridgeless had to ma
 -   **Frame Processor (true JSI, custom worklet runtime).** This is the only piece that is genuinely native to the JSI world. A JSI binding installs `global.VisionCameraProxy` and a Camera Frame is exposed to JS as a `jsi::HostObject`. The worklet runtime is a separate JS runtime running on a dedicated camera thread, not the React JS thread.
 
 So the right one-liner is: in v4, Vision Camera *runs under* Fabric and Bridgeless because RN's interop layer wraps legacy modules and view managers. It is not itself Fabric or TurboModule code.
+
+**Status as of RN 0.87:** that interop path is no longer an open-ended compatibility promise. Legacy module and view-manager shims are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` and `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` — builds that define those macros drop the wrappers entirely.[^rn-interop] A library that only "supports New Arch via interop" is on a deletion track; the durable path is a real TurboModule / Fabric component (or, as v5 did, Nitro).
 
 ## Advanced JSI: The Frame Processor
 
@@ -131,7 +134,7 @@ For this book, the v4 case study is still the more instructive one. It shows how
 
 ## Conclusion
 
-`react-native-vision-camera` demonstrates two things at once. First, that "supports the New Architecture" can mean nothing more than "runs under the interop layer", and a working production library can ship that way for years. Second, that JSI is the part of the New Architecture you actually feel as a user. A `jsi::HostObject` exposing a camera frame to a worklet, on a dedicated thread, is the kind of capability you cannot build on top of the legacy bridge no matter how hard you try. Tracking these patterns is a practical way to understand how production codebases bridge the gap between the legacy architecture and the new one.
+`react-native-vision-camera` demonstrates two things at once. First, that "supports the New Architecture" can historically mean nothing more than "runs under the interop layer" — v4 shipped that way successfully, but on RN 0.87 those shims are compile-gated for removal, so interop-only libraries should treat migration as urgent rather than optional. Second, that JSI is the part of the New Architecture you actually feel as a user. A `jsi::HostObject` (v4) or Nitro `HybridObject` (v5) exposing a camera frame to a worklet, on a dedicated thread, is the kind of capability you cannot build on top of the legacy bridge no matter how hard you try. V5's Nitro rewrite is the surviving production path; the v4 interop story is the cautionary one.
 
 ---
 
@@ -149,7 +152,7 @@ For this book, the v4 case study is still the more instructive one. It shows how
 
 [^vc-androidviewmanager]: `tmp/react-native-vision-camera/package/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt:19` (`class CameraViewManager : ViewGroupManager<CameraView>()`). Props are declared with `@ReactProp`.
 
-[^rn-interop]: RN provides automatic interop wrappers so that legacy view managers and bridge modules keep working when the host app enables Fabric and Bridgeless. The view-side wrapper lives under `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` (see `UnstableLegacyViewManagerAutomaticComponentDescriptor.{h,cpp}`); the module-side wrapper is `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.{h,mm}`.
+[^rn-interop]: RN provides automatic interop wrappers so that legacy view managers and bridge modules keep working when the host app enables Fabric and Bridgeless — **until those wrappers are compiled out**. The view-side wrapper lives under `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` and is gated by `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`; the module-side wrapper is `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.{h,mm}`, gated by `RCT_REMOVE_LEGACY_MODULE_INTEROP` (CHANGELOG v0.87.0-rc.0: `9885fe95ef`, `3278f309e2`).
 
 [^vc-androidmodule]: `tmp/react-native-vision-camera/package/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt:39` (`class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext)`). Methods are annotated `@ReactMethod`, the legacy bridge contract.
 

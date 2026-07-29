@@ -2,18 +2,18 @@
 title: "Additional Resources and Checklists"
 chapter: "15"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:13:59-04:00"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, checklists, migration, resources, codegen, library-authors]
 audit:
   status: "verified"
@@ -23,6 +23,7 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:59-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed iOS symbol name (RCTIsNewArchEnabled, not RCTIsNewArchitectureEnabled). Added v0.82 opt-out-removal context to dual-architecture guidance. Repaired two broken reactnative.dev URLs. Added RN-Tester path and noted RNNewArchitectureLibraries archive status. See _verification/chapters/15-resources/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 16: Additional Resources and Checklists
@@ -35,8 +36,9 @@ When migrating an existing application, be aware of these common challenges:
 
 1.  **Third-party Library Compatibility**: Not all third-party native libraries have been updated for the New Architecture. This is often the biggest hurdle. Always check a library's documentation for compatibility.
 2.  **Learning Curve**: Understanding the new concepts, especially the JSI, C++ types, and the new threading model, requires a learning investment.
-3.  **Build Configuration**: The New Architecture requires specific flags and build setups (`gradle.properties`, `Podfile`). Incorrect configuration is a common source of errors. On React Native 0.82 and newer, `newArchEnabled=false` in `gradle.properties` is rejected by the React Native Gradle Plugin with an explicit error, and `RCT_NEW_ARCH_ENABLED=0` in the iOS environment is ignored (the plugin still prints a warning).[^5]
+3.  **Build Configuration**: The New Architecture is hard-wired on for React Native 0.82+. `newArchEnabled=false` in `gradle.properties` is rejected by the React Native Gradle Plugin with an explicit error, and `RCT_NEW_ARCH_ENABLED=0` in the iOS environment is ignored (the helper still prints a warning).[^5] On 0.87+, also expect AGP v9 / Gradle 9.4.x, Kotlin ≥ 2.0, Node.js ≥ 22.13.0, and the Strict TypeScript API as the default JS surface (Metro `customConditions: ["react-native-legacy-deep-imports"]` to opt out temporarily).
 4.  **Testing Coverage**: Migrating can introduce subtle behavioral changes. Thorough end-to-end testing is critical to ensure all features work as expected.
+5.  **Interop compile-out:** Do not assume legacy `RCTBridgeModule` / Paper view managers will keep working indefinitely under Bridgeless. On the v0.87 line those shims are gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`; migrate libraries before those gates become unconditional.
 
 ## Recommended Development Tools
 
@@ -57,6 +59,8 @@ For authors of libraries that contain native code, the migration process involve
 -   **[ ] Provide `build.gradle` for Android:** Your Android library's `build.gradle` must apply the React Native Gradle Plugin so CodeGen runs and the generated C++ JNI sources link into your library's CMake build.[^3] `packages/react-native-popup-menu-android/android/build.gradle` is the closest in-tree example.
 -   **[ ] Document Compatibility:** Clearly state in your `README.md` which versions of your library support the New Architecture and what versions of React Native they are compatible with.[^4] If you still ship pre-0.82 support, document the minimum RN version each major library version targets.
 -   **[ ] Add CI for the Versions You Actually Support:** Set up CI to build and test your library's example app against every (RN version × architecture) combination you advertise. For libraries that only target RN ≥ 0.82, that means just one matrix axis (the New Architecture); for libraries that still claim RN ≤ 0.81 support, exercise both arches on those older versions to catch regressions.
+-   **[ ] Prefer public `'react-native'` imports:** On 0.87+, the Strict TypeScript API is the default. Deep imports into `react-native/Libraries/...` and `react-native/src/private/...` are restricted or untyped; use the published surface (and `HostInstance` instead of the removed/deprecated `NativeMethods` / `NativeMethodsMixin` types).
+-   **[ ] Use `ArrayBuffer` for binary TurboModule payloads (C++ / ObjC):** Spec methods that take/return `ArrayBuffer` instead of base64 strings. C++ and ObjC bridging support landed in 0.87 (`ReactCommon/react/bridging/ArrayBuffer.h`, ObjC `NSData` converters). Java/Kotlin CodeGen still rejects `ArrayBuffer` — use a pure-C++ TurboModule for Android binary payloads.
 
 ---
 

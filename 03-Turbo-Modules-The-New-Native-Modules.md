@@ -2,18 +2,18 @@
 title: "TurboModules: the new native modules"
 chapter: "03"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:25:19-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, turbomodules, jsi, codegen, native-modules]
 audit:
   status: "verified"
@@ -23,13 +23,14 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:25:19-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). See _verification/chapters/03-turbo-modules/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 4: TurboModules - The New Native Modules
 
 TurboModules are the second pillar of the New Architecture, representing a complete overhaul of the native module system. They replace the legacy system based on `RCTBridgeModule` and are designed from the ground up to be more performant, type-safe, and efficient. Just like Fabric, TurboModules are built directly on the foundation of the JSI and are the officially supported approach for new native modules in React Native 0.76+.[^3]
 
-**Current Status (2025):** TurboModules are now the default native module system in React Native 0.76+. All new native modules should be implemented as TurboModules, and the legacy `RCTBridgeModule` system is deprecated.
+**Current Status (v0.87):** TurboModules are not merely the default — they are **always on**. The `useTurboModules` feature flag was removed in v0.87.0-rc.0, and on iOS `RCTTurboModuleEnabled()` always returns `YES` while `RCTEnableTurboModule()` is a deprecated no-op.[^13] All new native modules should be implemented as TurboModules; the legacy `RCTBridgeModule` path survives only through the interop layer (still shipped in OSS builds, but compile-optional behind `RCT_REMOVE_LEGACY_MODULE_INTEROP`). As of v0.87, TurboModule bridging accepts `ArrayBuffer` on the **C++ and ObjC** paths; Java/JNI CodeGen still rejects it.[^14]
 
 ## Visual: TurboModule + CodeGen Pipeline
 
@@ -73,6 +74,10 @@ TurboModules enforce a strict, type-safe contract between JavaScript and the nat
 -   **The Spec is the Source of Truth:** A developer defines the module's interface in a TypeScript file.
 -   **CodeGen Enforces the Contract:** CodeGen parses the spec and generates native interface files. If the native implementation's method signature doesn't match the spec, the code won't compile.
 
+#### 4. First-class binary payloads (`ArrayBuffer`)
+
+As of React Native 0.87, `jsi::ArrayBuffer` is a supported bridging type for **C++ and ObjC** TurboModules. The shared C++ bridging layer (`ReactCommon/react/bridging/ArrayBuffer.h`) converts to and from JS `ArrayBuffer`, including an `AsyncArrayBuffer` helper for moving bytes off the JS thread without tying lifetime to a live `jsi::Runtime`.[^14] On iOS, ObjC TurboModules map inbound buffers to immutable `NSData` (copied so the buffer cannot be GC'd under the module) and outbound `NSMutableData` back to a JSI `ArrayBuffer`.[^15] Spec a method as taking or returning `ArrayBuffer` in TypeScript and CodeGen emits the matching C++ / ObjC signature — no base64, no JSON, no custom HostObject boilerplate. **Caveat:** the Java and JNI CodeGen generators still reject `ArrayBufferTypeAnnotation` with *"ArrayBuffer is only supported for C++ TurboModules."* — Kotlin/Java module authors who need binary payloads should use a pure-C++ TurboModule (or keep a base64 / `ReadableArray` workaround) until those generators catch up.[^16]
+
 ## How TurboModules Work Under the Hood
 
 The implementation of a TurboModule spans three layers:
@@ -112,8 +117,8 @@ First, define the spec. The file name is significant: it must start with `Native
 
 ```typescript
 // NativeMyModule.ts
-import type {TurboModule} from 'react-native/Libraries/TurboModule/RCTExport';
-import * as TurboModuleRegistry from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
+import type {TurboModule} from 'react-native';
+import {TurboModuleRegistry} from 'react-native';
 
 export interface Spec extends TurboModule {
   getSyncValue(): string;
@@ -190,7 +195,7 @@ class MyPackage : BaseReactPackage() {
 
 **Citations:**
 
-[^1]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h` (HEAD `7f8c75f2f7b`, upstream `b32a6c9e9db`, v0.86.0-rc.1 era). `class JSI_EXPORT TurboModule : public jsi::HostObject` at line 46. The `get` override is inlined at lines 55-65; `methodMap_` (the `std::unordered_map<std::string, MethodMetadata>` that maps method names to their host-function invokers) is declared at line 85.
+[^1]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h` (HEAD `ca750feefb1`, v0.87.0-rc.3 era). `class JSI_EXPORT TurboModule : public jsi::HostObject` at line 46. The `get` override is inlined at lines 55-65; `methodMap_` (the `std::unordered_map<std::string, MethodMetadata>` that maps method names to their host-function invokers) is declared at line 85.
 
 [^2]: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.h`. `class JSI_EXPORT ObjCTurboModule : public TurboModule` at line 52; `id<RCTBridgeModule> instance_` at line 73; `@protocol RCTTurboModule <RCTModuleProvider>` at line 191.
 
@@ -213,3 +218,11 @@ class MyPackage : BaseReactPackage() {
 [^11]: Confirmed by inspection of any RN-shipped module that's already migrated. For example, `BlobModule.kt:44-45` reads `class BlobModule(reactContext: ReactApplicationContext) : NativeBlobModuleSpec(reactContext), TurboModuleWithJSIBindings`. It extends the generated spec class and only adds `TurboModuleWithJSIBindings` (a separate interface for modules that install their own JSI bindings). It does NOT re-declare `TurboModule`, because the spec class already implements it.
 
 [^12]: `ReactPackage.kt:36-38` (`@Deprecated("Migrate to [BaseReactPackage] and implement [getModule] instead.")`); `ReactPackage.kt:51-52` declares the supported `getModule(name, reactContext)` hook. Live usage in `MainReactPackage.kt:108-137`, which switches on `name` and returns lazy-instantiated modules. `BaseReactPackage` provides the boilerplate needed to back the deprecated `createNativeModules` with `getModule` calls so the registry can still enumerate when asked.
+
+[^13]: `RCTTurboModuleEnabled` / `RCTEnableTurboModule` declared deprecated in `packages/react-native/React/Base/RCTBridge.h:50-53`. Body always returns `YES` / no-op in `RCTBridge.mm:189-197` (commits `aee4a2586e`, `feede1422b`). Feature-flag removal: CHANGELOG v0.87.0-rc.0, "Remove the `useTurboModules` feature flag. TurboModules are now always enabled." (`b4a715ca1f`).
+
+[^14]: C++ bridging: `packages/react-native/ReactCommon/react/bridging/ArrayBuffer.h` (`Bridging<jsi::ArrayBuffer>`, `AsyncArrayBuffer::{acquire,borrow}`). Added in v0.87.0-rc.0 (`226ef2e7c5`). `ArrayBufferKind` is enumerated in `TurboModule.h` alongside the other argument kinds.
+
+[^15]: ObjC conversion: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm` (`convertJSIArrayBufferToNSData`, `convertNSMutableDataToJSIArrayBuffer`; commit `54b88d9dea`). ObjC CodeGen emits `ArrayBufferKind` via `GenerateModuleObjCpp/serializeMethod.js`.
+
+[^16]: Java/JNI CodeGen still throws on `ArrayBufferTypeAnnotation`: `GenerateModuleJavaSpec.js` and `GenerateModuleJniCpp.js` both emit `Error('… ArrayBuffer is only supported for C++ TurboModules.')`.

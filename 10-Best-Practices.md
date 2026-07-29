@@ -2,18 +2,18 @@
 title: "Best practices"
 chapter: "10"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:16:17-04:00"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, best-practices, turbo-modules, fabric, jsi, codegen]
 audit:
   status: "verified"
@@ -23,6 +23,7 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:16:17-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed two factually wrong bullets (callback support, updateProps framing), tightened the CallInvoker thread-naming, added pure-C++ TurboModule and view-recycle notes, and added source-citation footnotes. See _verification/chapters/10-best-practices/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 11: Best Practices
@@ -65,7 +66,7 @@ Adopting the New Architecture effectively involves more than just avoiding mista
 [^1]: "Native Modules" (formerly titled "Turbo Native Modules"). React Native Documentation. [https://reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction)
 [^2]: "Fabric Native Components". React Native Documentation. [https://reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction)
 [^3]: "Native Commands". React Native Documentation. [https://reactnative.dev/docs/next/the-new-architecture/fabric-component-native-commands](https://reactnative.dev/docs/next/the-new-architecture/fabric-component-native-commands)
-[^4]: Interop entry points: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.h` (legacy NM shim), `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` (iOS view-manager shim), and `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/fabric/interop/` (Android counterpart). React Native HEAD `b32a6c9e9db` (RN 0.86-era).
+[^4]: Interop entry points: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.h` (legacy NM shim), `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` (iOS view-manager shim), and `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/fabric/interop/` (Android counterpart). As of RN HEAD `ca750feefb1` (v0.87.0-rc.3 era) these are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`.
 [^5]: CodeGen module pipeline: `packages/react-native-codegen/src/parsers/parsers-commons.js:328-425` (parsing) and `packages/react-native-codegen/src/generators/modules/GenerateModuleH.js` (generation). Generated specs become abstract C++ base classes that the native implementation `override`s.
 [^6]: Pure C++ TurboModules in RN itself: `packages/react-native/ReactCommon/react/nativemodule/microtasks/NativeMicrotasks.{h,cpp}` and `packages/react-native/ReactCommon/react/nativemodule/idlecallbacks/`. Each one extends a `Native<Name>CxxSpec<Impl>` base generated from the JS spec under `packages/react-native/src/private/webapis/.../specs/`.
 [^7]: `CallInvoker` definition: `packages/react-native/ReactCommon/callinvoker/ReactCommon/CallInvoker.h:27-50`. `invokeAsync(CallFunc&&)` schedules a callback that receives a `jsi::Runtime&` argument, which is the contract for "run me on the JS thread."

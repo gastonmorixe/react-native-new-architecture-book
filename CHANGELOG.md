@@ -5,8 +5,8 @@ All notable changes to this book are documented here.
 The format is loosely based on [Keep a Changelog][kac]. Versions track the
 React Native version the book is **verified against**, not a book-internal
 version number. Tags in this repo match the corresponding RN tag (e.g. tag
-`v0.86.0-rc.1` on the audit pass that grounded the book in RN
-`v0.86.0-rc.1` source).
+`v0.87.0-rc.3` on the refresh that grounded the book in RN
+`v0.87.0-rc.3` source).
 
 [kac]: https://keepachangelog.com/en/1.1.0/
 
@@ -14,6 +14,71 @@ Detailed per-chapter audit history lives in each chapter's YAML frontmatter
 `taillog` field. The audit workspace (`_verification/`, gitignored) holds
 the per-chapter claims, source citations, runnable tests, and reports the
 audit produced.
+
+---
+
+## [0.87.0-rc.3] - 2026-07-28
+
+Source-grounded refresh against React Native `main` at
+`ca750feefb1` (v0.87.0-rc.3 era), covering the delta since
+`v0.86.0-rc.2` through `v0.86.2` stable and the full 0.87 RC train
+(`v0.87.0-rc.0`…`v0.87.0-rc.3`).
+
+### Added
+
+- Chapter 4 (TurboModules): first-class `ArrayBuffer` bridging section
+  for C++ and ObjC (C++ `ReactCommon/react/bridging/ArrayBuffer.h`,
+  ObjC `NSData` converters). Notes that Java/JNI CodeGen still rejects
+  `ArrayBuffer`. Cites commits `226ef2e7c5` / `54b88d9dea`.
+- Chapter 6 (Bridgeless): v0.87 status on interop compile-out gates
+  (`RCT_REMOVE_LEGACY_MODULE_INTEROP`,
+  `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`).
+- Chapter 7 (Migration): 0.87 tooling requirements (AGP v9, Gradle
+  9.4.x, Kotlin ≥ 2.0, Node ≥ 22.13, `compileSdk` 37) and Strict
+  TypeScript API default (`customConditions:
+  ["react-native-legacy-deep-imports"]` opt-out).
+- Chapter 8 (Performance): callout for C++ Native Animated canary
+  (`cxxNativeAnimatedEnabled`, `ossReleaseStage: 'canary'`,
+  `expectedReleaseValue: true`) and ArrayBuffer TurboModule payloads.
+- Chapter 9 (Conclusion): roadmap bullets for legacy deletion,
+  ArrayBuffer TurboModules, C++ Native Animated, Strict TS API, Yoga
+  §4.5 auto min-size.
+- Chapter 16 (Resources): checklist items for Strict TS API imports
+  and `ArrayBuffer` binary payloads; interop compile-out as a migration
+  challenge.
+
+### Changed
+
+- Verified-against version bumped from `v0.86.0-rc.1` /
+  `b32a6c9e9db` to `v0.87.0-rc.3+main` / `ca750feefb1` across all
+  chapter frontmatter, README, and NOTES.
+- TurboModules framing: "default since 0.76" → "**always on** as of
+  0.87" (`useTurboModules` flag removed; `RCTTurboModuleEnabled()`
+  always `YES` and deprecated).
+- Bridgeless / future: `RCTArchConfiguratorProtocol` is no longer a
+  deprecated public header — it was **removed** on the v0.87 line.
+- FAQ Q1 rewritten: corrected the stale "you can still opt out via
+  gradle.properties / Podfile" claim (false since 0.82; the prior
+  0.86 audit left this regression in FAQs).
+
+### Fixed
+
+- Introduction still claimed opt-out was available via Chapter 7
+  procedures; rewritten for 0.82 removal + 0.87 hard-wiring.
+- Conclusion still claimed an opt-out flag "still exists"; corrected.
+- FAQ / Best Practices / Common Mistakes version-context lines updated
+  off the 0.86-era wording that implied opt-out or feature-flag-only
+  interop gating.
+- Chapter 14 (Nitro): corrected the stale "ArrayBuffer … none directly
+  supported by RN codegen" claim — C++/ObjC codegen support it as of
+  0.87; Java/JNI still reject.
+- Chapter 5 (CodeGen): added v0.87 platform matrix for `ArrayBuffer`
+  and note that pure-C++ modules no longer need
+  `includesGeneratedCode: true`.
+- Chapter 3 (Fabric): noted `RawPropsKey` prefix/suffix removal
+  (`67381e157f`).
+- Chapter 9 (Conclusion): View Transitions (0.86) +
+  `InteractionManager` → `requestIdleCallback` (0.87).
 
 ---
 

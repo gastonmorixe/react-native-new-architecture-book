@@ -2,18 +2,18 @@
 title: "Tutorial - Building a Native Module and Component"
 chapter: "14"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:23:33-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, tutorial, turbomodule, fabric, codegen]
 audit:
   status: "verified"
@@ -23,11 +23,12 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:23:33-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed iOS Promise method signature (RCTPromiseResolveBlock / RCTPromiseRejectBlock, not facebook::react::Promise<T>), Android base class (BaseReactPackage vs deprecated TurboReactPackage), generated Java spec class name (NativeDeviceInfoModuleSpec, not DeviceInfoSpec), ReactModuleInfo 6-arg ctor, added componentDescriptorProvider and <Name>Cls registration for the iOS Fabric view, added module-name companion object on Android. See _verification/chapters/14-tutorial/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 15: Tutorial - Building a Native Module and Component
 
-> **Audit note (RN 0.86):** the original draft of this chapter ships with a handful of incorrect signatures and out-of-date base classes that would break the build verbatim. The corrected code below is grounded in the current React Native source. Inline footnotes point at the exact files. The H1 still reads "Chapter 15" to match the rest of the book's running numbering, even though the filename starts with `14-`; this is a book-wide off-by-one that was not in scope to retitle.
+> **Audit note (RN 0.87):** the corrected code below is grounded in current React Native source (`ca750feefb1` era). Prefer public `'react-native'` imports — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/...` imports are restricted. Inline footnotes point at the exact files. The H1 still reads "Chapter 15" to match the book's running numbering, even though the filename starts with `14-`.
 
 This chapter provides a hands-on, step-by-step tutorial to create a simple React Native library that uses both a TurboModule and a Fabric Component. This will demonstrate how the concepts discussed in previous chapters come together in practice.
 
@@ -70,6 +71,14 @@ Next, configure `package.json` to tell React Native about your native module and
     "jsSrcsDir": "src/specs",
     "android": {
       "javaPackageName": "com.reactnativedeviceinfo"
+    },
+    "ios": {
+      "modulesProvider": {
+        "DeviceInfoModule": "DeviceInfoModule"
+      },
+      "componentProvider": {
+        "DeviceInfoView": "DeviceInfoView"
+      }
     }
   }
 }
@@ -158,13 +167,11 @@ RCT_EXPORT_MODULE()
 
 @end
 
-// Exposed C function the codegen-generated plugin map (RCTFabricComponentsPlugins.mm
-// equivalent for modules: RCTModuleProviders / <Lib>ModuleProvider.mm) calls to
-// hand back the concrete class.
-Class DeviceInfoModuleCls(void)
-{
-    return DeviceInfoModule.class;
-}
+// Module registration on iOS is *not* via a `<Name>Cls(void)` C function —
+// that pattern is for Fabric *components* only (see Part 3). TurboModules
+// are discovered through `RCT_EXPORT_MODULE()` and/or
+// `codegenConfig.ios.modulesProvider` in package.json (CodeGen emits the
+// module-provider map that maps the JS name to your class).
 ```
 
 A few corrections worth flagging if you cross-reference older tutorials:
@@ -270,7 +277,7 @@ Create a file at `src/specs/DeviceInfoViewNativeComponent.ts`.[^3]
 **`src/specs/DeviceInfoViewNativeComponent.ts`:**
 ```typescript
 import type { ViewProps } from 'react-native';
-import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
+import { codegenNativeComponent } from 'react-native';
 
 // Define the props that our native view will accept
 export interface NativeProps extends ViewProps {
@@ -434,7 +441,7 @@ Notes worth flagging:
 - `getDelegate()`'s return type must be `ViewManagerDelegate<DeviceInfoView>` (the parent's signature). Returning the concrete delegate class works in Java but Kotlin's stricter variance check sometimes complains; the explicit field type sidesteps it.
 - The generated `DeviceInfoViewManagerInterface` already declares `setLabel`. The override is enough; the `@ReactProp` annotation is only needed for the legacy bridge path and is currently still required for prop discovery on Paper.
 
-Finally, the manager needs to be included in your `BaseReactPackage` (or `TurboReactPackage`) via `createViewManagers`:
+Finally, the manager needs to be included in your `BaseReactPackage` via `getViewManagers`:
 
 ```kotlin
 class DeviceInfoPackage : BaseReactPackage() {

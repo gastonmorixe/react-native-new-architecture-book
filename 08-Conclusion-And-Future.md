@@ -2,18 +2,18 @@
 title: "Conclusion and future"
 chapter: "08"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:13:17-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, conclusion, summary, roadmap]
 audit:
   status: "verified"
@@ -23,6 +23,7 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:17-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed two broken citation URLs, updated React 18 framing to React 19 (current), clarified the Bridgeless-default-in-0.74 nuance, replaced the single em-dash, added inline source citations for the runtime claims. See _verification/chapters/08-conclusion/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 9: Conclusion and Future
@@ -41,9 +42,9 @@ The New Architecture is not a single feature, but a collection of interconnected
 
 -   **CodeGen** is the automated tooling that provides compile-time type safety. By generating native interface code from a single JavaScript source of truth (the `*NativeModule.ts` / `*NativeComponent.ts` specs), it eliminates an entire class of common runtime errors and makes developing native integrations more robust and maintainable. Generators emit C++ headers, JNI bindings, Java specs, and Objective-C++ stubs from one schema.[^6]
 
--   **Bridgeless Mode**, the runtime where the legacy message-queue Bridge is not initialized, has been the default *when the New Architecture is enabled* since React Native 0.74.[^1] In practice, most apps first ran in this mode after upgrading to 0.76, since that is the release where the New Architecture itself became the default.[^2] The legacy architecture is being phased out, not retroactively removed from existing apps: an opt-out flag (`newArchEnabled=false` on Android, `RCT_NEW_ARCH_ENABLED=0` for `pod install` on iOS) still exists, and the legacy Bridge remains in the codebase as a compatibility layer for un-migrated modules.[^2]
+-   **Bridgeless Mode**, the runtime where the legacy message-queue Bridge is not initialized, has been the default *when the New Architecture is enabled* since React Native 0.74.[^1] In practice, most apps first ran in this mode after upgrading to 0.76, since that is the release where the New Architecture itself became the default.[^2] Opt-out was removed in React Native 0.82: `newArchEnabled=false` / `RCT_NEW_ARCH_ENABLED=0` are force-overridden by the build tooling. On the v0.87 line, TurboModules are always enabled, and legacy Bridge / interop code continues to be deleted or compile-gated (`RCT_REMOVE_LEGACY_ARCH`, `RCT_REMOVE_LEGACY_MODULE_INTEROP`, `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`). The remaining Bridge symbols are a shrinking compatibility surface for un-migrated modules, not a supported alternate mode.[^2]
 
--   **Concurrent React features** are now fully supported, bringing automatic batching, transitions, and Suspense to React Native applications, and aligning the development experience with web React. Note that React Native's required React version has moved on since the New Architecture launched: 0.76 shipped with React 18, 0.78 (Feb 2025) bumped the peer dependency to React 19, and the current `main` (RN 0.86) pins `"react": "^19.2.3"`.[^7]
+-   **Concurrent React features** are now fully supported, bringing automatic batching, transitions, and Suspense to React Native applications, and aligning the development experience with web React. Note that React Native's required React version has moved on since the New Architecture launched: 0.76 shipped with React 18, 0.78 (Feb 2025) bumped the peer dependency to React 19, and the current `main` (RN 0.87) still pins `"react": "^19.2.3"`.[^7]
 
 ## The Impact: A More Performant and Capable Framework
 
@@ -51,15 +52,16 @@ The performance analysis shows that these architectural changes have yielded sig
 
 ## The Future of React Native
 
-With the New Architecture the default in React Native 0.76+ (shipped 2024-10-23), the foundation is set for the next era of React Native development. Bridgeless mode has been the default *within* the New Architecture since 0.74, and the legacy Bridge remains only for interop via compatibility layers. We can expect to see:
+With the New Architecture the default in React Native 0.76+ (shipped 2024-10-23) and opt-out gone since 0.82, the foundation is set for the next era of React Native development. Bridgeless mode has been the default *within* the New Architecture since 0.74; on the v0.87 line the remaining work is deleting legacy surfaces and shipping the Strict TypeScript API as the default JS surface. We can expect to see:
 
+-   **Legacy architecture deletion:** Compile-time gates (`RCT_REMOVE_LEGACY_ARCH`, `RCT_REMOVE_LEGACY_MODULE_INTEROP`, `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`) are already stripping Bridge stubs, legacy view-manager interop, and legacy module interop from builds that define them. Library authors who still rely on Paper / `RCTBridgeModule` should migrate before those gates become unconditional.
+-   **Binary-friendly TurboModules:** `ArrayBuffer` is a first-class bridging type for **C++ and ObjC** TurboModules as of v0.87 (Java/JNI CodeGen still rejects it), enabling binary payloads without base64 round-trips through JSON.
+-   **C++ Native Animated:** A shared C++ Animated backend (`cxxNativeAnimatedEnabled`) is rolling out via the canary feature-flag stage (`expectedReleaseValue: true`), driven from Fabric's frame callback — reducing JS↔native chatter for native-driven animations.
+-   **Strict TypeScript API as default:** Starting with v0.87.0-rc.1, React Native's default JavaScript API is the Strict TypeScript API; deep imports and legacy types (`NativeMethods`, `NativeMethodsMixin`) are restricted or removed. Opt out temporarily with Metro `customConditions: ["react-native-legacy-deep-imports"]`.
 -   **Deeper Integration with Concurrent React:** Features like Suspense for data fetching, which were previously difficult to implement, can now be fully realized, leading to more sophisticated and user-friendly loading and transition experiences.
--   **Further Performance Optimizations:** With the core bottlenecks removed, the community and the React Native team can now focus on more granular performance tuning at the JSI, Fabric, and TurboModule levels.
--   **A More Stable Developer Experience:** The move towards type-safe, spec-driven development will continue, making the creation of robust native modules and components more accessible and reliable.
--   **Web Alignment:** Active development is underway to align React Native more closely with web React, including a well-defined event loop modelled after the HTML spec, DOM-style Node and layout APIs (`getBoundingClientRect`, traversal), and Yoga-driven layout conformance.[^8]
--   **Enhanced Tooling:** The ecosystem continues to evolve with tools like Nitro providing alternative approaches to native module development, pushing the boundaries of performance and developer experience. See Chapter 14 for a detailed treatment.
-
-In conclusion, the React Native New Architecture is a resounding success. It has addressed the core limitations of the past and established a powerful, performant, and scalable foundation that will allow the framework to evolve and thrive for years to come. For any developer in the React Native ecosystem, understanding and embracing this new paradigm is no longer optional. It is the path forward.[^9]
+-   **Web Alignment:** Active development continues to align React Native more closely with web React, including a well-defined event loop modelled after the HTML spec, DOM-style Node and layout APIs (`getBoundingClientRect`, traversal), Yoga-driven layout conformance (including CSS Flexbox §4.5 automatic minimum sizing behind a Yoga errata bit), and early **View Transitions** plumbing (`NativeViewTransition` / Fabric commit hooks landed on the 0.86 line).[^8]
+-   **JS scheduling cleanup:** `InteractionManager` was removed in 0.87 — use `requestIdleCallback` (and the RuntimeScheduler idle tier) instead.
+-   **Enhanced Tooling:** The ecosystem continues to evolve with tools like Nitro providing alternative approaches to native module development. See Chapter 14 for a detailed treatment. It has addressed the core limitations of the past and established a powerful, performant, and scalable foundation that will allow the framework to evolve and thrive for years to come. For any developer in the React Native ecosystem, understanding and embracing this new paradigm is no longer optional. It is the path forward.[^9]
 
 ---
 

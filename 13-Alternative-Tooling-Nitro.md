@@ -2,18 +2,18 @@
 title: "Alternative tooling: Nitro"
 chapter: "13"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T19:58:00-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, nitro, hybrid-objects, jsi, third-party]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:44-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db) and Nitro v0.35.7 (commit 326d3e4b). Fixed chapter number, corrected fabricated benchmark / hot-reload / IDE claims, replaced with Nitro's own published numbers and accurate feature list, fixed stale doc-path footnotes, added RN source citations for NativeState / HostObject / TurboModule. See _verification/chapters/13-nitro/report.md."
   - "2026-05-23T19:58:00-0400 | Second-pass recheck against actual Nitro source at /tmp/nitro (commit 326d3e4b, v0.35.7). Ran nitrogen 0.35.7 on a toy spec (`tests/toy-spec/Math.nitro.ts`) and confirmed: 21 files emitted, prototype-based dispatch in generated .cpp, three-piece Swift pattern. Replaced 'will not parse' with the actual nitrogen error for generic specs. Added the Nitro-bootstraps-as-a-TurboModule note. Softened the 'HostObject can't be cached by JS Runtime' framing because TurboModule.h:55-65 does set up post-first-call setProperty caching. Documented C++/Swift/Kotlin platform-language pairs and the `nitro.json` autolinking requirement. Citations now include `tmp/nitro/...` source paths. See _verification/recheck/nitro/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 14: Alternative Tooling - Nitro
@@ -105,7 +106,8 @@ Nitro's tooling supports a wider range of types than standard codegen. The diffe
 - **Tuples** (`[A, B, C, ...]`): Nitro supports them. RN codegen does not (the codebase carries an explicit TODO for `TupleTypeAnnotation` support[^14]).
 - **Variants of distinct types** (`A | B | Person`): Nitro supports them via its [variants](https://nitro.margelo.com/docs/types/variants) machinery. RN codegen's `emitUnion` only accepts unions of primitives (`string`, `number`, `boolean`, and their literal forms, plus a single `ObjectTypeAnnotation` or alias),[^15] so an arbitrary cross-type union is rejected.
 - **Callbacks that return values** (`(T...) => R`): Nitro supports both `Promise<T>` (async, the default) and `Sync<T>` (synchronous) callback return types.[^16] In RN codegen, callbacks are restricted: the sample TurboModule spec only declares `(callback: (value: string) => void) => void`,[^17] and `throwIfUnsupportedFunctionReturnTypeAnnotationParserError` rejects function-typed return values outside the cxx-only path.[^18]
-- **`null` as a return type**, **`Int64`/`UInt64`**, **`ArrayBuffer`**, **`Record<string, T>`**: all supported by Nitro, none directly supported by RN codegen.[^4]
+- **`null` as a return type**, **`Int64`/`UInt64`**, **`Record<string, T>`**: still Nitro-only; RN codegen does not emit them.[^4]
+- **`ArrayBuffer`**: Nitro supports it across its Swift/Kotlin/C++ targets. As of RN 0.87, core codegen also supports `ArrayBuffer` for **C++ and ObjC** TurboModules (`ArrayBufferTypeAnnotation` → `jsi::ArrayBuffer` / `ArrayBufferKind`); the **Java and JNI** generators still reject it with *"ArrayBuffer is only supported for C++ TurboModules."*[^28] The remaining Nitro differentiator is therefore **Kotlin `ArrayBuffer` (and one spec that works identically on every Nitro target)** — not "RN has no ArrayBuffer."
 
 For literal-string enums like `type MediaType = 'image' | 'video' | 'audio'`, Nitro's nitrogen actually maps them to native enums backed by compile-time string hashes (not variants), and the union must be aliased to a named type for nitrogen to generate code for it.[^19]
 
@@ -182,3 +184,4 @@ For developers seeking very high throughput on JS-native calls, an object-orient
 [^25]: Reproducible: `_verification/recheck/nitro/tests/toy-spec/` contains `Math.nitro.ts`, `nitro.json`, and `nitrogen/generated/` with 21 files (2 shared C++, 2 iOS C++ bridge, 2 Swift, 6 iOS autolinking/umbrella, 2 Android C++ JNI, 2 Kotlin, 4 Android autolinking/loader, 1 `.gitattributes`). Nitrogen 0.35.7 produced these in 0.9s; see `run.log` next to the spec.
 [^26]: Nitro source: `tmp/nitro/packages/react-native-nitro-test/nitro.json` is the canonical example. Each Hybrid Object has an `autolinking` entry mapping `ios.implementationClassName` and `android.implementationClassName` to the concrete native classes that satisfy the generated spec.
 [^27]: Nitro source: `tmp/nitro/example/src/screens/BenchmarksScreen.tsx:42-65` (`function benchmark(obj: BenchmarkableObject): number { obj.addNumbers(0, 3); const start = performance.now(); let num = 0; for (let i = 0; i < ITERATIONS; i++) { num = obj.addNumbers(num, 3); } const end = performance.now(); return end - start; }` with `ITERATIONS = 100_000`). The same shape is published at `mrousavy/NitroBenchmarks` for cross-environment runs.
+[^28]: RN 0.87: C++/ObjC support via `GenerateModuleH.js` / `GenerateModuleObjCpp/serializeMethod.js` and `ReactCommon/react/bridging/ArrayBuffer.h` (commits `226ef2e7c5`, `54b88d9dea`). Java/JNI still throw in `GenerateModuleJavaSpec.js` / `GenerateModuleJniCpp.js`. See Chapter 4.

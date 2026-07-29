@@ -2,18 +2,18 @@
 title: "Performance analysis"
 chapter: "07"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:11:53-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, performance, jsi, fabric, turbomodules, runtimescheduler, bridgeless]
 audit:
   status: "verified"
@@ -23,6 +23,7 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:11:53-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Tightened lazy-module wording, corrected React-version references (RN now ships React 19.2.3), added a caveat block over the unsourced 2025 benchmark numbers, fixed two broken citation URLs, and added footnotes pointing at the relevant RN source files. See _verification/chapters/07-performance/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 8: Performance Analysis
@@ -31,7 +32,7 @@ The primary motivation for the New Architecture was to address the performance b
 
 **Updated Analysis (2025):** With the New Architecture now being the default in React Native 0.76+, we have extensive real-world performance data from production applications. The results consistently show significant improvements across all major performance metrics.
 
-> **Status as of v0.86 (2026 audit).** At the current upstream HEAD (`0.87.0-main`, post `v0.86.0-rc.1`), React Native's peer dependency on React is `^19.2.3`[^src-react-version]. The "React 18 concurrent features" framing below is still substantively correct, since React 19 is a superset of 18's concurrency model, but the specific reconciler version that ships in the box today is React 19.
+> **Status as of v0.87 (2026 refresh).** At the current upstream HEAD (`ca750feefb1`, post `v0.87.0-rc.3`), React Native's peer dependency on React is still `^19.2.3`[^src-react-version]. The "React 18 concurrent features" framing below is still substantively correct, since React 19 is a superset of 18's concurrency model, but the specific reconciler version that ships in the box today is React 19. Two New-Arch-adjacent performance tracks landed on the 0.87 line and are worth calling out separately: (1) TurboModules bridge `ArrayBuffer` on the **C++ and ObjC** paths (Java/JNI CodeGen still rejects it); (2) a shared C++ Native Animated backend (`cxxNativeAnimatedEnabled`) is enabled on the canary feature-flag stage (`expectedReleaseValue: true`, stable default still `false` — a CHANGELOG "flip default to true" entry was later walked back in Defaults) and is driven from Fabric's frame callback, cutting JS↔native chatter for native-driven animations.
 
 ## Visual: Call Overhead — Bridge vs JSI (Conceptual)
 
@@ -150,7 +151,7 @@ While not a universal panacea that makes every possible application faster, the 
 -   **App Startup:** Faster due to lazy loading and optimized initialization.
 -   **UI Rendering:** More efficient and responsive in complex applications, thanks to Fabric and concurrency.
 -   **Native Interop:** Orders of magnitude faster for frequent or synchronous communication, thanks to the JSI.
--   **React 18 Features:** Automatic batching, transitions, and Suspense provide additional performance benefits.
+-   **React 18+ / 19 Features:** Automatic batching, transitions, and Suspense provide additional performance benefits.
 
 The data shows that for the vast majority of real-world applications, migrating to the New Architecture yields significant and measurable performance improvements. The combination of JSI, Fabric, and React 18 concurrent features creates a powerful foundation for high-performance React Native applications.
 
@@ -166,7 +167,7 @@ The data shows that for the vast majority of real-world applications, migrating 
 [^6]: Medium, "React Native New Architecture: JSI". [https://medium.com/@elbahjat.abdel/react-native-new-architecture-jsi-c-api-for-js-975a71743c32](https://medium.com/@elbahjat.abdel/react-native-new-architecture-jsi-c-api-for-js-975a71743c32)
 [^7]: Reddit, "50x performance increase for bcrypt hashing". [https://www.reddit.com/r/reactnative/comments/13p2n3j/50x_performance_increase_for_bcrypt_hashing_by/](https://www.reddit.com/r/reactnative/comments/13p2n3j/50x_performance_increase_for_bcrypt_hashing_by/)
 
-**Source-grounded references** (RN commit `b32a6c9e9db`, 0.86 era):
+**Source-grounded references** (RN commit `ca750feefb1`, 0.87 era):
 
 [^src-rctcxxbridge]: `packages/react-native/React/CxxBridge/RCTCxxBridge.mm:449` ("Initialize all native modules that cannot be loaded lazily") and `RCTCxxBridge.mm:928-940` (the eager-instantiation loop that picks up `hasInstance` and `requiresMainQueueSetup` modules).
 [^src-tm-binding]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModuleBinding.cpp:160-205`. The comment on lines 188-198 spells out the lazy `jsRepresentation` pattern: an empty JS object is returned for the module, and its `__proto__` is the `HostObject` that materializes each property on first lookup via `TurboModule::get`.

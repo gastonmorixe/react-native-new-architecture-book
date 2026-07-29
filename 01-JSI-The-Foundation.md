@@ -2,18 +2,18 @@
 title: "JSI: The Foundation"
 chapter: "01"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:16:35-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, jsi, hermes, jsc, hostobject, hostfunction, cpp]
 audit:
   status: "verified"
@@ -23,6 +23,7 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:16:35-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed: removed non-existent Runtime::cloneValue; corrected PropNameID::compare to static call; replaced invalid ArrayBuffer(rt, size_t) and ArrayBuffer(rt, void*, size_t) ctors with MutableBuffer pattern; clarified default HostObject::set throws; noted variadic paramCount narrowing; added IRuntime/Runtime split context; expanded Value predicates. See _verification/chapters/01-jsi/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 2: JSI - The Foundation
@@ -31,7 +32,7 @@ At the very heart of the New Architecture lies the **JavaScript Interface (JSI)*
 
 Its definition can be found in the repository here: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` [^1]. Understanding the JSI is crucial because every other component of the New Architecture—Fabric, TurboModules, and even CodeGen—is built upon it.
 
-**Status as of v0.86 (`main`, commit `b32a6c9e9db`):** JSI is the only communication layer between JS and native code in the New Architecture, and the New Architecture has been **on by default since React Native 0.76 (October 2024)** [^2]. JSI itself has been the path for Hermes since long before 0.76. What 0.76 actually flipped on by default is the *stack built on JSI*: Fabric, TurboModules, and Bridgeless. As of v0.86, the legacy Bridge is being removed entirely from new app templates.
+**Status as of v0.87 (`main`, commit `ca750feefb1`):** JSI is the only communication layer between JS and native code in the New Architecture, and the New Architecture has been **on by default since React Native 0.76 (October 2024)** [^2] with **opt-out removed since 0.82**. JSI itself has been the path for Hermes since long before 0.76. What 0.76 actually flipped on by default is the *stack built on JSI*: Fabric, TurboModules, and Bridgeless. On the v0.87 line TurboModules are always enabled, and the legacy Bridge continues to be deleted / compile-gated out of builds.
 
 A note on terminology before we go further: in older RN versions the public C++ class users worked against was `jsi::Runtime`. The current source promotes `jsi::IRuntime` as the abstract interface and keeps `jsi::Runtime` as a backwards-compatible class that inherits from it [^3]. Either type works in user code, because `Runtime : public IRuntime`. The snippets in this chapter use `jsi::Runtime&` because that's the form most existing TurboModule and Vision Camera code uses, but you'll see `IRuntime&` in the upstream headers.
 
@@ -52,9 +53,9 @@ flowchart LR
 
 The JSI was designed to solve the core problems of the Bridge: serialization overhead and asynchronous communication. It achieves this through a few key principles:
 
-### 1. Shared Memory, Not Messages
+### 1. Direct References, Not Messages
 
-Instead of serializing data into JSON strings and sending them across a message queue, JSI allows the JavaScript and native worlds to hold direct references to each other's objects.
+Instead of serializing data into JSON strings and sending them across a message queue, JSI lets JavaScript and native code hold **handles** to each other's objects (`jsi::Object`, `jsi::HostObject`, `jsi::NativeState`) without a Bridge round-trip. That is not the same as a shared process heap for every value — accessors like `String::utf8(rt)` still allocate copies, while paths such as `ArrayBuffer::data()` can expose engine-managed bytes without a JSON marshal.
 
 **Bridge Architecture (Old):**
 ```javascript
@@ -68,10 +69,11 @@ const data = { users: [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }] };
 
 **JSI Architecture (New):**
 ```cpp
-// JavaScript and Native share the same memory reference
-// No serialization, no copying, just a pointer
-jsi::Object data = // ... reference to JS object
-// Direct access to properties without any conversion
+// Hold a JSI handle to a JS object (or expose a HostObject into JS).
+// Property access is a direct C++ call — no Bridge JSON message —
+// but the engine may still copy when you materialize strings/values.
+jsi::Object data = /* ... reference to JS object ... */;
+auto name = data.getProperty(rt, "name").asString(rt).utf8(rt); // may copy
 ```
 
 ### 2. Synchronous by Default
@@ -528,18 +530,20 @@ public:
 };
 ```
 
-## Real-World Example: Vision Camera's Frame Processor
+## Real-World Example: Vision Camera's Frame Processor (v4)
 
-The power of `jsi::HostObject` is perfectly demonstrated by the `react-native-vision-camera` library (see Chapter 13). Its Frame Processor feature works by:
+The power of `jsi::HostObject` is well demonstrated by **v4** of `react-native-vision-camera` (see Chapter 13). Its Frame Processor feature worked by:
 
 1.  Capturing a frame of video from the camera in native code.
 2.  Wrapping the raw pixel buffer in a C++ `Frame` object.
 3.  Wrapping that `Frame` object in a `FrameHostObject` which inherits from `jsi::HostObject`.
 4.  Passing this `FrameHostObject` to a JavaScript worklet function.
 
-When the developer's JavaScript code accesses `frame.width`, it is synchronously calling the `get()` method on the C++ `FrameHostObject`, which returns the width of the video frame with zero serialization overhead. This enables real-time video analysis directly in JavaScript, a feat impossible under the old architecture.
+When the developer's JavaScript code accessed `frame.width`, it synchronously called the `get()` method on the C++ `FrameHostObject`, returning the width with no Bridge JSON overhead. That enabled real-time video analysis in JavaScript — impossible under the legacy Bridge.
 
-**Performance Impact:** Vision Camera can process ~30 MB frame buffers at 60 FPS (approximately 2 GB of data per second) with minimal overhead thanks to JSI's direct memory access. This would be impossible with the legacy Bridge's serialization approach.
+**Note:** Vision Camera **v5** (April 2026) deleted `FrameHostObject` and moved Frame to a Nitro `HybridObject` (still JSI underneath, different authoring model). Treat the `FrameHostObject` sketch above as the v4 teaching example; Chapter 13 covers the v5 Nitro path.
+
+**Performance Impact:** Vision Camera could process large frame buffers at high FPS with minimal overhead thanks to JSI's direct handle access. This would be impossible with the legacy Bridge's serialization approach.
 
 ## Advanced JSI Patterns
 
@@ -907,7 +911,7 @@ public:
 
 **Citations:**
 
-[^1]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` (HEAD `7f8c75f2f7b`, upstream `b32a6c9e9db`, v0.86.0-rc.1 era). The full IRuntime / Runtime interface lives at lines 332-822; HostObject at 222-251; HostFunctionType at 217-218; Value at 1763-2078.
+[^1]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` (HEAD `ca750feefb1`, v0.87.0-rc.3 era). The full IRuntime / Runtime interface lives at lines 332-822; HostObject at 222-251; HostFunctionType at 217-218; Value at 1763-2078.
 
 [^2]: React Native 0.76.0 release blog, "New Architecture by default" (2024-10-23): https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture. CHANGELOG entry for v0.76 in `CHANGELOG-0.7x.md`. JSI itself shipped much earlier (experimental in 0.59, default on the Hermes path long before 0.76). What 0.76 turned on by default was the Fabric + TurboModules + Bridgeless stack built on JSI.
 

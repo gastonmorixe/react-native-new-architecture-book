@@ -2,18 +2,18 @@
 title: "Bridgeless: the ultimate goal"
 chapter: "05"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:13:55-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, bridgeless, jsi, turbomodules, interop, react-host, react-instance]
 audit:
   status: "verified"
@@ -23,13 +23,14 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:55-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed chapter number (was 'Chapter 6' on a file named 05-…), corrected the 0.74 blog citation URL, qualified the 'synchronous JSI' claim, added the v0.76 default-on context, named the actual runtime types (ReactInstance / ReactHost / RCTHost), pointed at the real interop classes (ObjCInteropTurboModule, JavaInteropTurboModule, RCTBridgeProxy), and fixed the mermaid diagram (the original `note left of NA:` is sequenceDiagram syntax and silently dropped its text in a flowchart). See _verification/chapters/05-bridgeless/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 6: Bridgeless - The Ultimate Goal
 
 The introduction of the JSI, Fabric, and TurboModules provides the foundational pieces to replace the legacy architecture. However, for a time, both the old and new systems could coexist in a single application to provide backward compatibility. The ultimate goal of the new architecture, however, was to completely remove the old one. This final state is known as **Bridgeless Mode**.
 
-Bridgeless Mode was first made available as an opt-in with React Native 0.73 (December 2023), became the default for New Architecture-enabled apps in React Native 0.74 (April 22, 2024) [^1], and has been on for every new project since React Native 0.76 (October 2024), when the New Architecture itself became default-on [^2]. At HEAD on the v0.86 line, the legacy non-bridgeless path on iOS is hardcoded off: `RCTRootViewFactoryConfiguration` always sets `_bridgelessEnabled = YES`, and the entire `RCTArchConfiguratorProtocol` (which exposed the `bridgelessEnabled`/`newArchEnabled`/`turboModuleEnabled`/`fabricEnabled` toggles) is deprecated "and will be removed when we remove the legacy architecture" [^3].
+Bridgeless Mode was first made available as an opt-in with React Native 0.73 (December 2023), became the default for New Architecture-enabled apps in React Native 0.74 (April 22, 2024) [^1], and has been on for every new project since React Native 0.76 (October 2024), when the New Architecture itself became default-on [^2]. Opt-out of the New Architecture (and therefore of Bridgeless) was removed in React Native 0.82. At HEAD on the v0.87 line, the legacy non-bridgeless path on iOS is hardcoded off: `RCTRootViewFactoryConfiguration` always sets `_bridgelessEnabled = YES`, and the old `RCTArchConfiguratorProtocol` (which exposed the `bridgelessEnabled`/`newArchEnabled`/`turboModuleEnabled`/`fabricEnabled` toggles) has been **removed from the public headers** rather than merely deprecated [^3]. TurboModules are always enabled (`RCTTurboModuleEnabled()` returns `YES`; the `useTurboModules` flag is gone).
 
 ## What is Bridgeless Mode?
 
@@ -73,7 +74,9 @@ The React Native team understood that a hard cutover to the new architecture was
 
 This layer allows legacy, Bridge-based native modules to continue functioning in a Bridgeless world. When JavaScript calls a method on a legacy module, the call enters native code through a JSI TurboModule binding, but the TurboModule on the other side is one of the interop wrappers (`ObjCInteropTurboModule` on iOS, `JavaInteropTurboModule` on Android). The wrapper discovers the legacy module's exported methods via runtime introspection of its `RCT_EXPORT_METHOD` / `@ReactMethod` declarations, converts arguments via `RCTConvert` (or its Java equivalent), and invokes the legacy method through `NSInvocation` / `jmethodID`. The legacy module's own `dispatch_queue_t methodQueue` (iOS) is wrapped in a `LegacyModuleNativeMethodCallInvoker` so the call still lands on the queue the module expected [^13].
 
-While this allows for backward compatibility, it does not provide the performance benefits of true TurboModules. The interop path pays runtime introspection cost on first use, ObjC dynamic dispatch / JNI call overhead per invocation, and `RCTConvert`-style argument coercion that CodeGen'd modules skip. The long-term goal is for the entire ecosystem to migrate to first-class TurboModule and Fabric APIs to reap the full benefits of the New Architecture.
+While this allows for backward compatibility, it does not provide the performance benefits of true TurboModules. The interop path pays runtime introspection cost on first use, ObjC dynamic dispatch / JNI call overhead per invocation, and `RCTConvert`-style argument coercion that CodeGen'd modules skip.
+
+**Status as of v0.87:** the interop layer itself is now on a deletion track. Shared C++ and platform legacy view-manager interop is compile-gated behind `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`, and legacy TurboModule interop behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` [^14]. Builds that define those macros no longer ship the shims. The long-term goal is unchanged: migrate the ecosystem to first-class TurboModule and Fabric APIs before those gates become unconditional.
 
 In conclusion, Bridgeless mode represents the fulfillment of the New Architecture's promise: a faster, more efficient, and more capable React Native. It marks a definitive shift away from the original design and sets a new foundation for the future of the framework.
 
@@ -83,7 +86,7 @@ In conclusion, Bridgeless mode represents the fulfillment of the New Architectur
 
 [^2]: "React Native 0.76 - New Architecture by default." React Native Blog, October 23, 2024. <https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture>.
 
-[^3]: `packages/react-native/Libraries/AppDelegate/RCTRootViewFactory.mm:62-79` (all init paths hardcode `_fabricEnabled = YES; _turboModuleEnabled = YES; _bridgelessEnabled = YES;`). `packages/react-native/Libraries/AppDelegate/RCTArchConfiguratorProtocol.h:13-14` ("RCTArchConfiguratorProtocol is deprecated and will be removed when we remove the legacy architecture.") and lines 20, 25, 30, 35 (`__attribute__((deprecated))` on every toggle).
+[^3]: `packages/react-native/Libraries/AppDelegate/RCTRootViewFactory.mm` (all init paths hardcode `_fabricEnabled = YES; _turboModuleEnabled = YES; _bridgelessEnabled = YES;`). On the v0.87 line, `RCTArchConfiguratorProtocol.h` is no longer shipped as a public header (removed alongside other legacy AppDelegate configurator APIs in commits such as `2148f15db5` / `ad9936faf6`); leftover `#pragma mark - RCTArchConfiguratorProtocol` comments in `RCTDefaultReactNativeFactoryDelegate.mm` are historical markers, not a live toggle surface.
 
 [^4]: iOS: `packages/react-native/ReactCommon/react/runtime/platform/ios/ReactCommon/RCTHost.h:75-83` (designated initializer takes a `RCTHostJSEngineProvider`, no `RCTBridge` anywhere). C++ runtime: `packages/react-native/ReactCommon/react/runtime/ReactInstance.h:23` (`class ReactInstance final : private jsinspector_modern::InstanceTargetDelegate`). Android: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/ReactHost.kt:23-28` ("A ReactHost is an object that manages a single `com.facebook.react.runtime.ReactInstance`. A ReactHost can be constructed without initializing the ReactInstance, and it will continue to exist after the instance is destroyed.").
 
@@ -104,3 +107,5 @@ In conclusion, Bridgeless mode represents the fulfillment of the New Architectur
 [^12]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:705-758` declares `class JSI_EXPORT Runtime : public IRuntime` with synchronous `Value getProperty(...)`, `bool hasProperty(...)`, `void setPropertyValue(...)`, etc. JSI calls execute inline on the caller's thread; they do not queue work.
 
 [^13]: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleManager.mm:136-157` defines `class LegacyModuleNativeMethodCallInvoker : public ModuleNativeMethodCallInvoker`. Lines 451-466 build it from the legacy module's `dispatch_queue_t methodQueue` and wrap the module in `ObjCInteropTurboModule`. The legacy method is invoked via `NSInvocation` against the original `RCT_EXPORT_METHOD` selectors.
+
+[^14]: CHANGELOG v0.87.0-rc.0: "Gate shared C++ and Android Java/Kotlin legacy view manager interop behind `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`" (`9885fe95ef`); "Gate legacy TurboModule interop behind `RCT_REMOVE_LEGACY_MODULE_INTEROP`" (`3278f309e2`). Matching guards appear in `packages/react-native/React/Base/RCTBridge.h` and `LegacyViewManagerInteropComponentDescriptor`.

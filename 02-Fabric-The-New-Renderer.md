@@ -2,18 +2,18 @@
 title: "Fabric - The New Renderer"
 chapter: "02"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-05-23T16:17:21-0400"
+updated_at: "2026-07-28T22:15:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.86.0-rc.1+main"
-  tag: "v0.86.0-rc.1"
-  commit: "b32a6c9e9db2284547183e2d48ffa0a45a73fbc6"
-  date: "2026-05-22"
-  note: "Upstream RN main HEAD as of the audit. Past v0.86.0-rc.1 by ~30 commits."
+  version: "0.87.0-rc.3+main"
+  tag: "v0.87.0-rc.3"
+  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
+  date: "2026-07-28"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
 tags: [react-native, new-architecture, fabric, renderer, shadow-tree, yoga, mounting]
 audit:
   status: "verified"
@@ -23,13 +23,14 @@ audit:
 taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:17:21-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). See _verification/chapters/02-fabric/report.md."
+  - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
 ---
 
 # Chapter 3: Fabric - The New Renderer
 
 Fabric is the name of React Native's modern rendering system, a complete re-implementation of the UI manager that lies at the heart of the New Architecture. Built on top of the JSI, Fabric delivers a more performant, responsive, and interoperable UI layer. It replaces the legacy "UIManager" and fundamentally changes how React Native translates JavaScript component trees into native platform views.
 
-**Current Status (2025):** Fabric is now the default renderer in React Native 0.76+. It powers all React Native applications and provides significant performance improvements, especially for complex UIs and animations. The legacy UIManager is deprecated and will be removed in future versions.
+**Current Status (v0.87):** Fabric is the default renderer in React Native 0.76+ and the only path on RN ≥ 0.82. It powers Concurrent React on the mobile host (React peer `^19.2.3`) and provides significant performance improvements for complex UIs and animations. The legacy UIManager continues to be stripped under `RCT_REMOVE_LEGACY_ARCH`.
 
 ## The Motivation: From UIManager to Fabric
 
@@ -171,6 +172,8 @@ class Props : public virtual Sealable,
 ```
 
 There is no `revision`, no `source`, no `rawProps` member on the base `Props`. Parsing happens through `RawPropsParser` walking the JS values and dispatching per-property hashes to the matching `setProp` overload. This is how Fabric avoids the per-update JSON allocations that the legacy renderer paid.
+
+**v0.87 note on prop names:** `RawPropsKey` no longer carries a separate prefix/suffix — keys are flat names only (CHANGELOG Breaking, commit `67381e157f`). Custom native components and third-party frameworks that previously composed prefixed keys (Nitro called this out in the commit discussion) must use the flat name form.
 
 `ViewProps` is a `using` alias for `HostPlatformViewProps`, which on most platforms aliases `BaseViewProps`. The inheritance graph is `BaseViewProps : public YogaStylableProps, public AccessibilityProps`, and `YogaStylableProps` is what eventually inherits from `Props`. The flattened field set on `BaseViewProps` looks like this:
 
@@ -712,9 +715,9 @@ static void RCTPerformMountInstructions(
 
 The point is "no JSON parsing on the main thread" rather than "compare C++ structs directly". The struct comparison still happens, but it's against the cached previous `Props::Shared` that the component view holds.
 
-## React 18 Concurrent Features: Real-World Impact
+## React 18+ / React 19 Concurrent Features: Real-World Impact
 
-Fabric runs on top of React 18. The concurrent features below are React-level features (`useTransition`, `Suspense`, automatic batching of async `setState`s) that ship with any React 18 host, including the legacy renderer in RN 0.70+. What Fabric specifically unlocks is the synchronous mount path that lets these features actually feel responsive: a `useTransition` that interrupts itself is useless if the eventual commit blocks the UI thread for 60ms on the legacy bridge. So treat the examples below as "this is what becomes practical on the New Architecture", not "this is what Fabric implements internally".
+Fabric runs on top of React 19 (RN's peer dependency is `"react": "^19.2.3"`). The concurrent features below arrived with React 18 (`useTransition`, `Suspense`, automatic batching of async `setState`s) and remain the capability set on React 19 hosts — including the legacy renderer in older RN releases. What Fabric specifically unlocks is the synchronous mount path that lets these features actually feel responsive: a `useTransition` that interrupts itself is useless if the eventual commit blocks the UI thread for 60ms on the legacy bridge. So treat the examples below as "this is what becomes practical on the New Architecture", not "this is what Fabric implements internally".
 
 ### Automatic Batching in Practice
 
