@@ -1,4 +1,7 @@
-# A Comprehensive Report on the React Native New Architecture
+> [!NOTE] 
+> Last update: RN v0.87.0-rc.3 2026-07-28
+
+# Comprehensive Research on the React Native New Architecture
 
 > A deep-dive research report on the React Native New Architecture, covering core concepts, practical guides, real-world case studies, and more.
 
