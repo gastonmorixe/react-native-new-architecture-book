@@ -2,18 +2,18 @@
 title: "Fabric - The New Renderer"
 chapter: "02"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, fabric, renderer, shadow-tree, yoga, mounting]
 audit:
   status: "verified"
@@ -24,13 +24,14 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:17:21-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). See _verification/chapters/02-fabric/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Re-verified ShadowTree, descriptor, and prop paths. Updated React peer to ^19.3.0, documented ShadowTreeCommitSource and commit branching flags, and added currentReactRevision_ and commitMode_ to the ShadowTree snippet. Fixed RawPropsKey note, added commit hooks step, iterator-setter path, and differ/flattening/prepared text notes."
 ---
 
 # Chapter 3: Fabric - The New Renderer
 
 Fabric is the name of React Native's modern rendering system, a complete re-implementation of the UI manager that lies at the heart of the New Architecture. Built on top of the JSI, Fabric delivers a more performant, responsive, and interoperable UI layer. It replaces the legacy "UIManager" and fundamentally changes how React Native translates JavaScript component trees into native platform views.
 
-**Current Status (v0.87):** Fabric is the default renderer in React Native 0.76+ and the only path on RN ≥ 0.82. It powers Concurrent React on the mobile host (React peer `^19.2.3`) and provides significant performance improvements for complex UIs and animations. The legacy UIManager continues to be stripped under `RCT_REMOVE_LEGACY_ARCH`.
+**Current Status (v0.88.1):** Fabric is the default renderer in React Native 0.76+ and the only path on RN ≥ 0.82. It powers Concurrent React on the mobile host (React peer `^19.3.0`) and provides significant performance improvements for complex UIs and animations. The legacy UIManager continues to be stripped under `RCT_REMOVE_LEGACY_ARCH`.
 
 ## The Motivation: From UIManager to Fabric
 
@@ -173,7 +174,9 @@ class Props : public virtual Sealable,
 
 There is no `revision`, no `source`, no `rawProps` member on the base `Props`. Parsing happens through `RawPropsParser` walking the JS values and dispatching per-property hashes to the matching `setProp` overload. This is how Fabric avoids the per-update JSON allocations that the legacy renderer paid.
 
-**v0.87 note on prop names:** `RawPropsKey` no longer carries a separate prefix/suffix — keys are flat names only (CHANGELOG Breaking, commit `67381e157f`). Custom native components and third-party frameworks that previously composed prefixed keys (Nitro called this out in the commit discussion) must use the flat name form.
+**v0.87 note on prop names:** the `RawPropsKey` type (with its prefix, name, and suffix parts) is gone. `RawPropsKey.h` no longer exists at HEAD. Prop names are flat strings now, and the lookup table is `RawPropsKeyMap` in `core/RawPropsKeyMap.h` (`insert(std::string_view, index)`, `reindex()`, `at(std::string_view)`). Source: commit `67381e157f` (CHANGELOG Breaking). Custom native components and third-party frameworks that composed prefixed keys (Nitro was the one known user) must use the flat name form.
+
+**Iterator-setter path (since 0.87, off by default):** `ConcreteComponentDescriptor::cloneProps` has a second construction path. When `ConcreteProps` has an iterator-setter constructor and `enableCppPropsIteratorSetter` is on (default `false`), Fabric copies the source props and walks `RawProps` in place with `forEachItem`, calling `setProp` per entry. This skips `RawProps::parse` and the `folly::dynamic` copy. The classic path shown above stays the default.
 
 `ViewProps` is a `using` alias for `HostPlatformViewProps`, which on most platforms aliases `BaseViewProps`. The inheritance graph is `BaseViewProps : public YogaStylableProps, public AccessibilityProps`, and `YogaStylableProps` is what eventually inherits from `Props`. The flattened field set on `BaseViewProps` looks like this:
 
@@ -355,18 +358,21 @@ class ShadowTree final {
   // feature flag for the bounded-attempts fallback.
   mutable std::shared_mutex revisionMutex_;
   mutable std::recursive_mutex revisionMutexRecursive_;
+  mutable CommitMode commitMode_{CommitMode::Normal};
   mutable ShadowTreeRevision currentRevision_;
+  mutable std::optional<ShadowTreeRevision> currentReactRevision_;  // branching
   std::shared_ptr<const MountingCoordinator> mountingCoordinator_;
 };
 ```
 
-The actual `tryCommit` implementation (`ShadowTree.cpp:329`) does five things in order:
+The actual `tryCommit` implementation (`ShadowTree.cpp:337`) does these things in order:
 
 1. Acquire a *shared* (reader) lock on `revisionMutex_` and snapshot `currentRevision_`.
 2. Invoke the transaction with the old root, producing a new `RootShadowNode::Unshared`.
 3. Optionally reconcile state across the JS branch and main branch via `progressState(...)`.
-4. Run `newRootShadowNode->layoutIfNeeded(&affectedLayoutableNodes)`. This is the layout pass; it only re-runs Yoga on subtrees whose layout-affecting state changed.
-5. Acquire a *unique* (writer) lock. If `currentRevision_.number` has moved under us, return `CommitStatus::Failed` and let the caller retry. Otherwise, increment the revision, seal the tree, and either push the revision to the `MountingCoordinator` (synchronous mode) or store it as a pending React revision (concurrent mode).
+4. Run the commit hooks (`delegate_.shadowTreeWillCommit(...)`). A hook may replace the new root or return `nullptr`, which cancels the commit.
+5. Run `newRootShadowNode->layoutIfNeeded(&affectedLayoutableNodes)`. This is the layout pass; it only re-runs Yoga on subtrees whose layout-affecting state changed.
+6. Acquire a *unique* (writer) lock. If `currentRevision_.number` has moved under us, return `CommitStatus::Failed` and let the caller retry. Otherwise, increment the revision, seal the tree, and either push the revision to the `MountingCoordinator` (synchronous mode) or store it as a pending React revision (concurrent mode).
 
 The "lock-free atomic bool" was a simplification in earlier drafts; the real machinery is a conventional reader/writer mutex with retry-on-conflict, plus a bounded-attempt fall-back to an exclusive lock to prevent unbounded retries.
 
@@ -401,6 +407,8 @@ shadowTree.commit(
      .mountSynchronously = true,
      .source = ShadowTreeCommitSource::Unknown});
 ```
+
+`ShadowTreeCommitSource` has four values on main: `Unknown`, `React`, `AnimationEndSync`, and `ReactRevisionMerge`. The last one belongs to commit branching. With `enableFabricCommitBranching` (default `false`, no OSS release stage) React commits go to a separate "React revision" that `getCurrentReactRevision()` returns. The newer flag `enableFabricCommitBranchingMergeOnMainThread` (added 2026-09, default `false`) controls where that revision merges back. Treat both as experimental.
 
 The transaction returns the new root or `nullptr` (which becomes `CommitStatus::Cancelled`). Note that the transaction body must return a `RootShadowNode::Unshared` (i.e. `std::shared_ptr<RootShadowNode>`), not a `Shared`, because the new revision needs an owning mutable handle to seal at commit time.
 
@@ -547,6 +555,8 @@ CommitStatus ShadowTree::tryCommit(
 }
 ```
 
+The abridged code above leaves out three parts that exist at HEAD. First, a `TraceSection` and a `PerformanceTracerSection` wrap the commit. Second, `delegate_.shadowTreeWillCommit(...)` runs the commit hooks after state reconciliation. Third, when `enableFabricCommitBranching` is on and the source is `React` or `AnimationEndSync`, the commit reads and writes `currentReactRevision_` instead of `currentRevision_`, and `scheduleReactRevisionPromotion()` replaces the direct `mount()` call. The writer lock section also calls `updateMountedFlag(...)` before sealing.
+
 The `mount()` call goes through `mountingCoordinator_->push(revision)` and then notifies the delegate. The diff is computed lazily by the platform consumer when it pulls.
 
 **Tree Diffing Algorithm:**
@@ -618,6 +628,8 @@ void YogaLayoutableShadowNode::layoutTree(
 ```
 
 The direction is derived from `layoutConstraints.layoutDirection`, so RTL surfaces don't hard-code `YGDirectionLTR`. The `pointScaleFactor` is set per-config when a `YogaLayoutableShadowNode` is constructed (in `configureYogaTree`), not on a transient config object per commit.
+
+**Recent differ and text changes (0.88 era, main):** the differ unflatten feature flag was removed (commit `a016535a83f`, the corrected parent-tag path is now always on), and a fix stops the differ from creating or deleting a view that a nested flatten or unflatten moves (`361bc240e42`). A `View` that is a live region (`aria-live` or `accessibilityLiveRegion`) is no longer flattened (`5e13324903a`). Prepared text layout is on by default (`enablePreparedTextLayout`, default `true` in `ReactNativeFeatureFlags.config.js:570`, commit `a5cb48b2fc3`).
 
 ### Phase 3: The Mount Phase (C++ → Native Platform)
 
@@ -717,7 +729,7 @@ The point is "no JSON parsing on the main thread" rather than "compare C++ struc
 
 ## React 18+ / React 19 Concurrent Features: Real-World Impact
 
-Fabric runs on top of React 19 (RN's peer dependency is `"react": "^19.2.3"`). The concurrent features below arrived with React 18 (`useTransition`, `Suspense`, automatic batching of async `setState`s) and remain the capability set on React 19 hosts — including the legacy renderer in older RN releases. What Fabric specifically unlocks is the synchronous mount path that lets these features actually feel responsive: a `useTransition` that interrupts itself is useless if the eventual commit blocks the UI thread for 60ms on the legacy bridge. So treat the examples below as "this is what becomes practical on the New Architecture", not "this is what Fabric implements internally".
+Fabric runs on top of React 19 (RN's peer dependency is `"react": "^19.3.0"`). The concurrent features below arrived with React 18 (`useTransition`, `Suspense`, automatic batching of async `setState`s) and remain the capability set on React 19 hosts — including the legacy renderer in older RN releases. What Fabric specifically unlocks is the synchronous mount path that lets these features actually feel responsive: a `useTransition` that interrupts itself is useless if the eventual commit blocks the UI thread for 60ms on the legacy bridge. So treat the examples below as "this is what becomes practical on the New Architecture", not "this is what Fabric implements internally".
 
 ### Automatic Batching in Practice
 

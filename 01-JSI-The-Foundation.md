@@ -2,18 +2,18 @@
 title: "JSI: The Foundation"
 chapter: "01"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, jsi, hermes, jsc, hostobject, hostfunction, cpp]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:16:35-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed: removed non-existent Runtime::cloneValue; corrected PropNameID::compare to static call; replaced invalid ArrayBuffer(rt, size_t) and ArrayBuffer(rt, void*, size_t) ctors with MutableBuffer pattern; clarified default HostObject::set throws; noted variadic paramCount narrowing; added IRuntime/Runtime split context; expanded Value predicates. See _verification/chapters/01-jsi/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Re-verified jsi.h and jsi.cpp refs. Noted new IRuntime error factories (createError and typed variants), IRuntime::length(String), JSError(msg) ctor change, Value::toString fix. HostObject, ArrayBuffer, PropNameID facts unchanged."
 ---
 
 # Chapter 2: JSI - The Foundation
@@ -32,7 +33,7 @@ At the very heart of the New Architecture lies the **JavaScript Interface (JSI)*
 
 Its definition can be found in the repository here: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` [^1]. Understanding the JSI is crucial because every other component of the New Architecture—Fabric, TurboModules, and even CodeGen—is built upon it.
 
-**Status as of v0.87 (`main`, commit `ca750feefb1`):** JSI is the only communication layer between JS and native code in the New Architecture, and the New Architecture has been **on by default since React Native 0.76 (October 2024)** [^2] with **opt-out removed since 0.82**. JSI itself has been the path for Hermes since long before 0.76. What 0.76 actually flipped on by default is the *stack built on JSI*: Fabric, TurboModules, and Bridgeless. On the v0.87 line TurboModules are always enabled, and the legacy Bridge continues to be deleted / compile-gated out of builds.
+**Status as of v0.88 (`main`, commit `9c7b0f5fafd`, v0.88.1 stable):** JSI is the only communication layer between JS and native code in the New Architecture, and the New Architecture has been **on by default since React Native 0.76 (October 2024)** [^2] with **opt-out removed since 0.82**. JSI itself has been the path for Hermes since long before 0.76. What 0.76 actually flipped on by default is the *stack built on JSI*: Fabric, TurboModules, and Bridgeless. On the v0.87 and v0.88 lines TurboModules are always enabled, and the legacy Bridge continues to be deleted / compile-gated out of builds.
 
 A note on terminology before we go further: in older RN versions the public C++ class users worked against was `jsi::Runtime`. The current source promotes `jsi::IRuntime` as the abstract interface and keeps `jsi::Runtime` as a backwards-compatible class that inherits from it [^3]. Either type works in user code, because `Runtime : public IRuntime`. The snippets in this chapter use `jsi::Runtime&` because that's the form most existing TurboModule and Vision Camera code uses, but you'll see `IRuntime&` in the upstream headers.
 
@@ -911,15 +912,15 @@ public:
 
 **Citations:**
 
-[^1]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` (HEAD `ca750feefb1`, v0.87.0-rc.3 era). The full IRuntime / Runtime interface lives at lines 332-822; HostObject at 222-251; HostFunctionType at 217-218; Value at 1763-2078.
+[^1]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` (HEAD `9c7b0f5fafd`, v0.88.1 era). The full IRuntime / Runtime interface lives at lines 338-822; HostObject at 222-251; HostFunctionType at 217-218; Value at 1766-2078. Since the last refresh `IRuntime` gained `createError`, `createTypeError` and the other typed error factories (jsi.h:662-675) and `length(const String&)` (jsi.h:681). `JSError(rt, std::string)` now builds its value through `rt.createError` (jsi.cpp:968-970), and `Value::toString` uses `asString` so a non-string result throws (jsi.cpp:924-926).
 
 [^2]: React Native 0.76.0 release blog, "New Architecture by default" (2024-10-23): https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture. CHANGELOG entry for v0.76 in `CHANGELOG-0.7x.md`. JSI itself shipped much earlier (experimental in 0.59, default on the Hermes path long before 0.76). What 0.76 turned on by default was the Fabric + TurboModules + Bridgeless stack built on JSI.
 
-[^3]: `IRuntime` is the abstract interface (jsi.h:332-685); `Runtime : public IRuntime` keeps the older surface alive for backward compatibility (jsi.h:705-822). The header docs at 332-337 explicitly state "for backward compatibility, these APIs are also accessible via the Runtime object directly".
+[^3]: `IRuntime` is the abstract interface (jsi.h:338-685); `Runtime : public IRuntime` keeps the older surface alive for backward compatibility (jsi.h:705-822). The header docs at 332-337 explicitly state "for backward compatibility, these APIs are also accessible via the Runtime object directly".
 
-[^4]: `HostObject::set` default implementation: `packages/react-native/ReactCommon/jsi/jsi/jsi.cpp:280-285`. It throws `JSError(rt, "TypeError: Cannot assign to property '<name>' on HostObject with default setter")`. Confirmed by the `NopHostObject` test in `packages/react-native/ReactCommon/jsi/jsi/test/testlib.cpp:440-454`.
+[^4]: `HostObject::set` default implementation: `packages/react-native/ReactCommon/jsi/jsi/jsi.cpp:280-285`. It throws `JSError(rt, "TypeError: Cannot assign to property '<name>' on HostObject with default setter")`. Confirmed by the `NopHostObject` test in `packages/react-native/ReactCommon/jsi/jsi/test/testlib.cpp:495-510`.
 
-[^5]: `PropNameID::compare` declaration: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:950-955` (`static bool compare(IRuntime&, const PropNameID&, const PropNameID&)`). Real usage in `packages/react-native/ReactCommon/jsi/jsi/test/testlib.cpp:350-354`.
+[^5]: `PropNameID::compare` declaration: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:950-955` (`static bool compare(IRuntime&, const PropNameID&, const PropNameID&)`). Real usage in `packages/react-native/ReactCommon/jsi/jsi/test/testlib.cpp:44-77`.
 
 [^6]: `ArrayBuffer` constructor: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:1556` (`ArrayBuffer(IRuntime&, std::shared_ptr<MutableBuffer>)`). `MutableBuffer` interface at `packages/react-native/ReactCommon/jsi/jsi/jsi.h:167-172`.
 

@@ -2,18 +2,18 @@
 title: "Introduction: the why"
 chapter: "00"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, introduction, jsi, fabric, turbomodules, bridge]
 audit:
   status: "verified"
@@ -24,15 +24,16 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:19:57-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed citation [^1] YouTube id (UcqRXTriUVI), citation [^2] URL (/architecture/landing-page), Obj-C++ codegen return type (NSString * not std::string), React-version reference (React 18+ / 19), Bridge message-format pedagogy, and JSI 'shared memory' / 'zero-copy' phrasing. See _verification/chapters/00-introduction/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). React peer now ^19.3.0. RCTTurboModuleEnabled() was deleted (01d55273bcf, after v0.88.1). RCTArchConfiguratorProtocol.h is gone, but a pragma mark remains. Fixed moved paths (RCTExport.d.ts, NativeSampleTurboModule.js) and shifted line numbers in footnotes."
 ---
 
 # Chapter 1: Introduction - The "Why"
 
 The React Native New Architecture is arguably the most significant evolution in the framework's history. While it became the default in the React Native 0.76 release in October 2024[^2], its story begins much earlier. The vision was first shared with the community in a 2018 presentation at React Conf[^1]. This marked the beginning of a multi-year effort to fundamentally re-imagine the communication layer between JavaScript and the native host platform.
 
-**Important Update (2026):** As of React Native 0.76, the New Architecture is enabled by default for all new projects. As of React Native 0.82, **opt-out was removed entirely**: `newArchEnabled=false` on Android and `RCT_NEW_ARCH_ENABLED=0` on iOS are force-overridden by the build tooling, and `RCTIsNewArchEnabled()` is hard-wired to `YES`. On the v0.87 line, TurboModules are likewise always on (`RCTTurboModuleEnabled()` always returns `YES` and is deprecated). iOS builds default to stripping legacy Bridge code via `RCT_REMOVE_LEGACY_ARCH=1`; separately, legacy module / view-manager **interop** can be compiled out behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` (opt-in macros — OSS apps still ship the shims unless they define them). See Chapter 7 for the migration path; there is no supported New-Arch escape hatch on current releases.
+**Important Update (2026):** As of React Native 0.76, the New Architecture is enabled by default for all new projects. As of React Native 0.82, **opt-out was removed entirely**: `newArchEnabled=false` on Android and `RCT_NEW_ARCH_ENABLED=0` on iOS are force-overridden by the build tooling, and `RCTIsNewArchEnabled()` is hard-wired to `YES`. TurboModules are likewise always on. The always-on `RCTTurboModuleEnabled()` flag function existed through v0.88.1 and was deleted on main after it (commit `01d55273bcf`, 2026-10-27). iOS builds default to stripping legacy Bridge code via `RCT_REMOVE_LEGACY_ARCH=1`; separately, legacy module / view-manager **interop** can be compiled out behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` (opt-in macros — OSS apps still ship the shims unless they define them). See Chapter 7 for the migration path; there is no supported New-Arch escape hatch on current releases.
 
-**Future Plans:** The React Native team is actively deleting the legacy Bridge architecture, not merely deprecating it. The C++ headers under `packages/react-native/ReactCommon/cxxreact/` still carry `[[deprecated("This API will be removed along with the legacy architecture.")]]` on classes such as `JSExecutor`, `Instance`, `ModuleRegistry`, `NativeToJsBridge`, `CxxNativeModule`, `JSIExecutor`, and `JSINativeModules`[^3], and many of those symbols are already wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH` so they disappear from builds that define the flag. On iOS, `RCTArchConfiguratorProtocol` (the old `bridgelessEnabled` / `newArchEnabled` / `turboModuleEnabled` / `fabricEnabled` toggles) has been removed from the public headers on the v0.87 line, and further legacy symbols such as `RCTCxxBridge` continue to be deleted. Developers still on RN ≤ 0.81 should plan a hard cutover before upgrading further.
+**Future Plans:** The React Native team is actively deleting the legacy Bridge architecture, not merely deprecating it. The C++ headers under `packages/react-native/ReactCommon/cxxreact/` still carry `[[deprecated("This API will be removed along with the legacy architecture.")]]` on classes such as `JSExecutor`, `Instance`, `ModuleRegistry`, `NativeToJsBridge`, `CxxNativeModule`, `JSIExecutor`, and `JSINativeModules`[^3], and many of those symbols are already wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH` so they disappear from builds that define the flag. On iOS, `RCTArchConfiguratorProtocol` (the old `bridgelessEnabled` / `newArchEnabled` / `turboModuleEnabled` / `fabricEnabled` toggles) has been removed from the public headers (since the v0.87 line), and further legacy symbols such as `RCTCxxBridge` continue to be deleted. Developers still on RN ≤ 0.81 should plan a hard cutover before upgrading further.
 
 This was not a minor refactoring but a deep, foundational change designed to address systemic performance bottlenecks and unlock new capabilities for the framework. To fully appreciate the new architecture, one must first understand the limitations of the system it replaced: the original architecture, centered around a component known as "the Bridge."
 
@@ -306,7 +307,7 @@ Generated Obj-C++ interface (the actual codegen output shape is in `packages/rea
 
 ### 3. Concurrent Rendering: Modern React Features
 
-The new architecture supports React 18's concurrent features and, at the current React Native HEAD, the React 19 peer dependency (`"react": "^19.2.3"` in `packages/react-native/package.json`)[^react-pin]:
+The new architecture supports React 18's concurrent features and, at the current React Native HEAD, the React 19 peer dependency (`"react": "^19.3.0"` in `packages/react-native/package.json`)[^react-pin]:
 
 **Automatic Batching Example:**
 ```javascript
@@ -393,7 +394,7 @@ console.log(`Found ${results.length} active users`);
 
 ### 5. React 18 and Beyond: Future-Proof Architecture
 
-The new architecture enables cutting-edge React features. Note that `use(promise)` was experimental/canary in React 18 and became stable in React 19. Since React Native main now pins React 19.2+, the example below works out of the box[^react-pin]:
+The new architecture enables cutting-edge React features. Note that `use(promise)` was experimental/canary in React 18 and became stable in React 19. Since React Native main now pins React 19.3+, the example below works out of the box[^react-pin]:
 
 **Suspense for Data Fetching:**
 ```javascript
@@ -465,14 +466,14 @@ The evolution of native modules, built on JSI, which are loaded on-demand and ca
 
 [^1]: Parashuram N, "React Native's New Architecture" (React Conf 2018). YouTube video id `UcqRXTriUVI`. [https://www.youtube.com/watch?v=UcqRXTriUVI](https://www.youtube.com/watch?v=UcqRXTriUVI)
 [^2]: "About the New Architecture". React Native Documentation. [https://reactnative.dev/architecture/landing-page](https://reactnative.dev/architecture/landing-page)
-[^3]: C++ deprecation attributes that quote the phrase verbatim, in `packages/react-native/ReactCommon/cxxreact/`: `JSExecutor.h:34,48,56`, `Instance.h:37,44`, `NativeToJsBridge.h:41`, `ModuleRegistry.h:28,33`, `MethodCall.h:20,33`, `JSIndexedRAMBundle.h:26`, `CxxNativeModule.h:26,29`, `JSModulesUnbundle.h:18`, `RAMBundleRegistry.h:26`, `NativeModule.h:19,31`, plus `packages/react-native/ReactCommon/jsiexecutor/jsireact/JSIExecutor.h:71` and `JSINativeModules.h:24`. Run `rg "removed along with the legacy" packages/react-native/` to enumerate. [https://github.com/facebook/react-native](https://github.com/facebook/react-native)
+[^3]: C++ deprecation attributes that quote the phrase verbatim, in `packages/react-native/ReactCommon/cxxreact/`: `JSExecutor.h:36,50,58`, `Instance.h:39,46`, `NativeToJsBridge.h:43`, `ModuleRegistry.h:30,35`, `MethodCall.h:22,35`, `CxxNativeModule.h:28,31`, `JSModulesUnbundle.h:20`, `RAMBundleRegistry.h:28`, `NativeModule.h:21,33`, plus `packages/react-native/ReactCommon/jsiexecutor/jsireact/JSIExecutor.h:73` and `JSINativeModules.h:26` (`JSIndexedRAMBundle.h` no longer exists). Run `rg "removed along with the legacy" packages/react-native/` to enumerate. [https://github.com/facebook/react-native](https://github.com/facebook/react-native)
 [^3a]: Obj-C variant in `packages/react-native/Libraries/AppDelegate/`: `RCTAppDelegate.h` and `RCTReactNativeFactory.h` still carry "removed when removing the legacy architecture" deprecations on bridge-era APIs. `RCTArchConfiguratorProtocol.h` itself was deleted from the public headers on the v0.87 line (commits `2148f15db5` / `ad9936faf6`).
 [^geo]: `navigator.geolocation` was removed from React Native core in three commits in April 2019: `45bd2b514b5` ("Remove navigator.geolocation, use Geolocation", 2019-04-01), `9834c580af6` ("Move Geolocation JS code to FB internal", 2019-04-01), and `17dbf988845` ("Move iOS Geolocation code out from the repo", 2019-04-02). Recommended replacement: [`@react-native-community/geolocation`](https://github.com/michalchudziak/react-native-geolocation).
 [^bridge-wire]: `packages/react-native/Libraries/BatchedBridge/MessageQueue.js`, lines 33-35 (the `MODULE_IDS=0; METHOD_IDS=1; PARAMS=2;` constants), 140 and 324 (`this._queue = [[], [], [], this._callID]`), 253-254 (`this._queue[MODULE_IDS].push(moduleID); this._queue[METHOD_IDS].push(methodID);`), 227-231 (callback id encoding via `_callID << 1`).
-[^rct-export]: `packages/react-native/React/Base/RCTBridgeModule.h:218` defines `#define RCT_EXPORT_METHOD(method) RCT_REMAP_METHOD(, method)`. The macro is annotated with `RCT_DEPRECATED` on the surrounding `methodQueue` property and is part of the legacy-arch surface scheduled for removal.
-[^tm-spec]: `packages/react-native/Libraries/TurboModule/RCTExport.d.ts:10-12` defines `export interface TurboModule { getConstants?(): {}; }`. A representative spec is `packages/react-native/src/private/specs_DEPRECATED/modules/NativeSampleTurboModule.js:33` (`export interface Spec extends TurboModule { ... }`).
+[^rct-export]: `packages/react-native/React/Base/RCTBridgeModule.h:263` defines `#define RCT_EXPORT_METHOD(method) RCT_REMAP_METHOD(, method)`. The macro is annotated with `RCT_DEPRECATED` on the surrounding `methodQueue` property and is part of the legacy-arch surface scheduled for removal.
+[^tm-spec]: `packages/react-native/types_DEPRECATED/Libraries/TurboModule/RCTExport.d.ts:10-12` defines `export interface TurboModule { getConstants?(): {}; }`. A representative spec is `packages/rn-tester/js/examples/TurboModule/NativeSampleTurboModule.js:26` (`export interface Spec extends TurboModule { ... }`).
 [^tm-codegen]: Codegen snapshot at `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleHObjCpp-test.js.snap`, lines 855-862 (`NSString *name() const; ... double id_() const;`) and 978 (`inline NSString *JS::NativeExceptionsManager::ExceptionData::name() const`). String fields in Obj-C++ codegen are `NSString *`, never `std::string`. The C++-only ("Cxx") variant emits `std::string` instead; see `GenerateModuleH-test.js.snap`.
-[^react-pin]: `packages/react-native/package.json:151-153`: `"peerDependencies": { ..., "react": "^19.2.3" }`. The bundled reconciler in this build line targets React 19.
+[^react-pin]: `packages/react-native/package.json:143-146`: `"peerDependencies": { ..., "react": "^19.3.0" }`. The bundled reconciler in this build line targets React 19.
 [^tm-registry]: `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.js:17-46`. `turboModuleProxy = global.__turboModuleProxy`, then `requireModule<T>(name)` calls `turboModuleProxy(name)` on demand.
 [^jsi-header]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h` (~2,266 lines). Includes only the C++ standard library. Engine bindings live in sibling directories (`hermes/`, `jsc/`).
-[^fabric-measure]: `packages/react-native/ReactCommon/react/renderer/uimanager/UIManager.h:183-186`: `LayoutMetrics getRelativeLayoutMetrics(const ShadowNode &shadowNode, const ShadowNode *ancestorShadowNode, LayoutableShadowNode::LayoutInspectingPolicy policy) const;`.
+[^fabric-measure]: `packages/react-native/ReactCommon/react/renderer/uimanager/UIManager.h:189-192`: `LayoutMetrics getRelativeLayoutMetrics(const ShadowNode &shadowNode, const ShadowNode *ancestorShadowNode, LayoutableShadowNode::LayoutInspectingPolicy policy) const;`.

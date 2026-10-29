@@ -2,18 +2,18 @@
 title: "Research session notes"
 chapter: "NOTES"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable. Main is 795 commits past it."
 tags: [react-native, new-architecture, logbook, audit, meta]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:15:34-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Original logbook preserved verbatim. Added an audit annotations section flagging two stale facts: the opt-out flow was removed in v0.82, and the symbol the author 'corrected to' (`RCTIsNewArchitectureEnabled`) does not exist (actual symbol is `RCTIsNewArchEnabled`). See _verification/chapters/notes/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). See CHANGELOG.md 0.88.1 entry."
 ---
 
 # Research session notes

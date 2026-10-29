@@ -2,18 +2,18 @@
 title: "Additional Resources and Checklists"
 chapter: "15"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, checklists, migration, resources, codegen, library-authors]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:13:59-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed iOS symbol name (RCTIsNewArchEnabled, not RCTIsNewArchitectureEnabled). Added v0.82 opt-out-removal context to dual-architecture guidance. Repaired two broken reactnative.dev URLs. Added RN-Tester path and noted RNNewArchitectureLibraries archive status. See _verification/chapters/15-resources/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Fixed stale Java ArrayBuffer claim (Java TurboModules support ArrayBuffer since 0.88, only Promise<ArrayBuffer> is rejected). Fixed popup-menu build file name (build.gradle.kts). Interop gates now opt-in via CocoaPods/SwiftPM (0.88). Fixed RCTUtils.mm line refs and ModelCodegenConfig note (no ios field in the Kotlin model). All 9 external URLs return 200."
 ---
 
 # Chapter 16: Additional Resources and Checklists
@@ -36,9 +37,9 @@ When migrating an existing application, be aware of these common challenges:
 
 1.  **Third-party Library Compatibility**: Not all third-party native libraries have been updated for the New Architecture. This is often the biggest hurdle. Always check a library's documentation for compatibility.
 2.  **Learning Curve**: Understanding the new concepts, especially the JSI, C++ types, and the new threading model, requires a learning investment.
-3.  **Build Configuration**: The New Architecture is hard-wired on for React Native 0.82+. `newArchEnabled=false` in `gradle.properties` is rejected by the React Native Gradle Plugin with an explicit error, and `RCT_NEW_ARCH_ENABLED=0` in the iOS environment is ignored (the helper still prints a warning).[^5] On 0.87+, also expect AGP v9 / Gradle 9.4.x, Kotlin ≥ 2.0, Node.js ≥ 22.13.0, and the Strict TypeScript API as the default JS surface (Metro `customConditions: ["react-native-legacy-deep-imports"]` to opt out temporarily).
+3.  **Build Configuration**: The New Architecture is hard-wired on for React Native 0.82+. `newArchEnabled=false` in `gradle.properties` is rejected by the React Native Gradle Plugin with an explicit error, and `RCT_NEW_ARCH_ENABLED=0` in the iOS environment is ignored (the helper still prints a warning).[^5] On 0.87+, also expect AGP v9 / Gradle 9.4.x (the `helloworld` app pins 9.4.1), Node.js ^22.13.0 || ^24.3.0 || >= 26.0.0 (`packages/react-native/package.json` `engines`), and the Strict TypeScript API as the default JS surface (Metro `customConditions: ["react-native-legacy-deep-imports"]` to opt out temporarily).
 4.  **Testing Coverage**: Migrating can introduce subtle behavioral changes. Thorough end-to-end testing is critical to ensure all features work as expected.
-5.  **Interop compile-out:** Do not assume legacy `RCTBridgeModule` / Paper view managers will keep working indefinitely under Bridgeless. On the v0.87 line those shims are gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`; migrate libraries before those gates become unconditional.
+5.  **Interop compile-out:** Do not assume legacy `RCTBridgeModule` / Paper view managers will keep working indefinitely under Bridgeless. On the v0.87 and v0.88 lines those shims are gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`. Since 0.88 you can opt in to both from CocoaPods and SwiftPM (default off, planned to become the default). Migrate libraries before those gates become unconditional.
 
 ## Recommended Development Tools
 
@@ -53,24 +54,24 @@ The following tools can be helpful when working with the New Architecture:
 For authors of libraries that contain native code, the migration process involves a few extra steps to ensure consumers of your library have a smooth experience.
 
 -   **[ ] Ship CodeGen Specs:** Your TypeScript or Flow spec files must be included in your published npm package. CodeGen reads each linked library's `codegenConfig.jsSrcsDir` at build time, so if the specs are excluded by `.npmignore` or `files`, the consuming app's build will fail to generate the glue code.
--   **[ ] Add `codegenConfig` to `package.json`:** This is essential so the consuming app's build process knows how to run CodeGen on your library's specs.[^2] The schema is `{ name, type, jsSrcsDir, android, ios, includesGeneratedCode }`, modeled on the Android side at `packages/gradle-plugin/shared/src/main/kotlin/com/facebook/react/model/ModelCodegenConfig.kt`.[^9] See `packages/react-native-popup-menu-android/package.json` for a single-platform example or `packages/react-native/package.json` for the multi-library shape (`codegenConfig.libraries[]`).
+-   **[ ] Add `codegenConfig` to `package.json`:** This is essential so the consuming app's build process knows how to run CodeGen on your library's specs.[^2] The schema is `{ name, type, jsSrcsDir, android, ios, includesGeneratedCode }`. The Android side models only `name, type, jsSrcsDir, android, includesGeneratedCode` in `packages/gradle-plugin/shared/src/main/kotlin/com/facebook/react/model/ModelCodegenConfig.kt`.[^9] See `packages/react-native-popup-menu-android/package.json` for a single-platform example or `packages/react-native/package.json` for the multi-library shape (`codegenConfig.libraries[]`).
 -   **[ ] Implement Both Architectures (Only if You Support RN ≤ 0.81):** Before React Native 0.82, library authors used the `BuildConfig.IS_NEW_ARCHITECTURE_ENABLED` flag on Android and the `RCTIsNewArchEnabled()` utility on iOS to register the correct module implementation at runtime.[^1] Starting with React Native 0.82, opt-out from the New Architecture was removed: on iOS `RCTIsNewArchEnabled()` is hardcoded to return `YES`,[^1] and on Android the React Native Gradle Plugin hardcodes the `IS_NEW_ARCHITECTURE_ENABLED` `buildConfigField` to `"true"`.[^10] So this checklist item only matters if your library still ships releases for users pinned to RN ≤ 0.81; for libraries that already require RN ≥ 0.82, drop the conditional and ship the New Arch implementation only.
 -   **[ ] Provide a `Podspec` for iOS:** The `.podspec` file for your library must correctly declare its dependencies and source files. Working references in RN itself: `packages/rn-tester/NativeModuleExample/ScreenshotManager.podspec`, `NativeComponentExample/MyNativeView.podspec`, `NativeCxxModuleExample/NativeCxxModuleExample.podspec`.
--   **[ ] Provide `build.gradle` for Android:** Your Android library's `build.gradle` must apply the React Native Gradle Plugin so CodeGen runs and the generated C++ JNI sources link into your library's CMake build.[^3] `packages/react-native-popup-menu-android/android/build.gradle` is the closest in-tree example.
+-   **[ ] Provide `build.gradle` for Android:** Your Android library's `build.gradle` must apply the React Native Gradle Plugin so CodeGen runs and the generated C++ JNI sources link into your library's CMake build.[^3] `packages/react-native-popup-menu-android/android/build.gradle.kts` is the closest in-tree example.
 -   **[ ] Document Compatibility:** Clearly state in your `README.md` which versions of your library support the New Architecture and what versions of React Native they are compatible with.[^4] If you still ship pre-0.82 support, document the minimum RN version each major library version targets.
 -   **[ ] Add CI for the Versions You Actually Support:** Set up CI to build and test your library's example app against every (RN version × architecture) combination you advertise. For libraries that only target RN ≥ 0.82, that means just one matrix axis (the New Architecture); for libraries that still claim RN ≤ 0.81 support, exercise both arches on those older versions to catch regressions.
 -   **[ ] Prefer public `'react-native'` imports:** On 0.87+, the Strict TypeScript API is the default. Deep imports into `react-native/Libraries/...` and `react-native/src/private/...` are restricted or untyped; use the published surface (and `HostInstance` instead of the removed/deprecated `NativeMethods` / `NativeMethodsMixin` types).
--   **[ ] Use `ArrayBuffer` for binary TurboModule payloads (C++ / ObjC):** Spec methods that take/return `ArrayBuffer` instead of base64 strings. C++ and ObjC bridging support landed in 0.87 (`ReactCommon/react/bridging/ArrayBuffer.h`, ObjC `NSData` converters). Java/Kotlin CodeGen still rejects `ArrayBuffer` — use a pure-C++ TurboModule for Android binary payloads.
+-   **[ ] Use `ArrayBuffer` for binary TurboModule payloads (C++ / ObjC):** Spec methods that take/return `ArrayBuffer` instead of base64 strings. C++ and ObjC bridging support landed in 0.87 (`ReactCommon/react/bridging/ArrayBuffer.h`, ObjC `NSMutableData *` mapping, restored in 0.88). Java/Kotlin TurboModules gained `com.facebook.react.bridge.ArrayBuffer` support in 0.88. Borrowed bytes are valid only during the synchronous call: copy with `ArrayBuffer.arrayBufferWithCopiedBytes` to keep them. Java CodeGen still rejects `Promise<ArrayBuffer>` (`throwIfUnsupportedPromiseArrayBuffer`).
 
 ---
 
 **Citations:**
 
-[^1]: `packages/react-native/React/Base/RCTUtils.h:18` declares `RCT_EXTERN BOOL RCTIsNewArchEnabled(void);`. The implementation in `packages/react-native/React/Base/RCTUtils.mm:46-49` is hardcoded to `return YES;` since commit `83e6eaf693f` ("Prevent users from opting-out of the New Architecture", PR #53026, first released in v0.82.0-rc.0, 2025-08-05).
+[^1]: `packages/react-native/React/Base/RCTUtils.h:18` declares `RCT_EXTERN BOOL RCTIsNewArchEnabled(void);`. The implementation in `packages/react-native/React/Base/RCTUtils.mm:47-50` is hardcoded to `return YES;` since commit `83e6eaf693f` ("Prevent users from opting-out of the New Architecture", PR #53026, first released in v0.82.0-rc.0, 2025-08-05).
 [^2]: "Using Codegen". React Native Documentation. [https://reactnative.dev/docs/next/the-new-architecture/using-codegen](https://reactnative.dev/docs/next/the-new-architecture/using-codegen)
 [^3]: "React Native Gradle Plugin". React Native Documentation. [https://reactnative.dev/docs/react-native-gradle-plugin](https://reactnative.dev/docs/react-native-gradle-plugin)
 [^4]: "About the New Architecture". React Native Documentation. [https://reactnative.dev/architecture/landing-page](https://reactnative.dev/architecture/landing-page)
-[^5]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt:61-84` (Android error on `newArchEnabled=false`) and the v0.82 CHANGELOG entry "**New Architecture:** Add warning if `RCT_NEW_ARCH_ENABLED` is set to 0" (commit `7d0bef2f25`).
+[^5]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt:61-84`, `checkLegacyArchProperty` (Android error on `newArchEnabled=false`) and the v0.82 CHANGELOG entry "**New Architecture:** Add warning if `RCT_NEW_ARCH_ENABLED` is set to 0" (commit `7d0bef2f25`).
 [^6]: `react-native-builder-bob`. Callstack. [https://github.com/callstack/react-native-builder-bob](https://github.com/callstack/react-native-builder-bob)
 [^7]: RN-Tester native examples: `packages/rn-tester/NativeModuleExample/`, `packages/rn-tester/NativeCxxModuleExample/`, `packages/rn-tester/NativeComponentExample/`.
 [^8]: `react-native-community/RNNewArchitectureLibraries` (archived 2024-03-20): [https://github.com/react-native-community/RNNewArchitectureLibraries](https://github.com/react-native-community/RNNewArchitectureLibraries). Successor working group: [https://github.com/reactwg/react-native-new-architecture](https://github.com/reactwg/react-native-new-architecture).

@@ -17,6 +17,99 @@ audit produced.
 
 ---
 
+## [0.88.1] - 2026-10-29
+
+Source-grounded refresh against React Native `main` at
+`9c7b0f5fafd` (v0.88.1 era). The delta since `ca750feefb1` covers
+`v0.87.0`, `v0.87.1`, the 0.88 RC train, `v0.88.0`, `v0.88.1`, and 795
+commits on `main` after `v0.88.1`. Nine workers checked the chapters in
+parallel against the source. Each chapter `taillog` has the detail.
+
+### Added
+
+- Chapter 2 (JSI): new `IRuntime` error factories (`createError` and
+  typed variants), `IRuntime::length(String)`, and the `JSError`
+  and `Value::toString` behavior changes.
+- Chapter 3 (Fabric): `ShadowTreeCommitSource`, the React-branch commit
+  path, the `RawPropsKeyMap` replacement of `RawPropsKey`, the
+  iterator-setter `cloneProps` path, the differ unflatten flag removal,
+  live-region Views no longer flattened, and prepared text layout on by
+  default.
+- Chapter 4 (TurboModules) and Chapter 5 (CodeGen): Java/Kotlin
+  `ArrayBuffer` support in v0.88.0 with its borrow contract. Codegen
+  discovery fixes.
+- Chapters 6, 11, 12: the `RCT_REMOVE_LEGACY_MODULE_INTEROP` and
+  `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` gates are opt-in from CocoaPods
+  and SwiftPM since v0.88.0. They default to off.
+- Chapter 13 (Vision Camera): v5.2.4 snapshot with the Nitro 0.37.0 pin.
+- Chapter 14 (Nitro): stable `v0.37.1`. Mention of the
+  `v1.0.0-alpha` nightlies. Nitrogen 0.37.1 re-run on the toy spec.
+
+### Changed
+
+- Verified-against version bumped from `v0.87.0-rc.3+main` /
+  `ca750feefb1` to `v0.88.1+main` / `9c7b0f5fafd` across all chapter
+  frontmatter, README, and NOTES.
+- React peer dependency is now `^19.3.0` (reconciler 19.3.0).
+- Strict TypeScript API default is dated `v0.87.0` (CHANGELOG.md:292),
+  not `v0.87.0-rc.1`.
+- `RCTTurboModuleEnabled()` and `RCTEnableTurboModule()`: they still
+  exist in v0.88.1. Commit `01d55273bcf` deletes them on `main`.
+- Chapter 6 (Bridgeless): `bridgelessEnabled` is gone from
+  `RCTRootViewFactoryConfiguration`. The bridge proxy path in
+  `RCTInstance.mm` replaced `setCurrentBridge`.
+- Chapter 7 (Migration): iOS template snippet is `SceneDelegate` based.
+  Tooling values: AGP 9.2.1, Kotlin 2.3.21, Gradle 9.4.1, `compileSdk`
+  37, `minCompileSdk` 34, current Node engines range.
+- Many footnote line references moved and were re-numbered.
+
+### Fixed
+
+- Chapters 4, 5, 8, 14, 16: the claim that Java/JNI codegen rejects
+  `ArrayBuffer` is now false. Only `Promise<ArrayBuffer>` is rejected
+  (`modules/Utils.js:95`).
+- Chapter 8 (Performance): `RCTCxxBridge.mm` was removed in v0.87.0
+  (`86350ab9884`). The citation now points at tag `v0.86.3`.
+- Chapter 15 (Tutorial): `RCTImageViewManager.mm` no longer exists.
+  `RCTPromiseResolveBlock` and `RCTPromiseRejectBlock` are `_Nullable`.
+- Chapter 16 (Resources): `ModelCodegenConfig.kt` has no `ios` field.
+  The popup-menu build file is `build.gradle.kts`.
+- URLs checked: reactnative.dev and GitHub links return HTTP 200 or exist
+  in a fresh `react-native-website` clone.
+
+### New chapters
+
+- Chapter 17 (`16-Interview-Questions.md`): 27 interview questions in five
+  parts: architecture, runtime and JavaScript, UI and performance, native
+  code and ecosystem, and testing. Each answer has a short spoken answer,
+  key points, a common wrong answer, a follow-up, and source footnotes.
+  Two fact-check workers re-verified Q1 to Q20 and fixed 11 errors.
+  Examples: `Platform.OS` branches are removed from the bundle, FlashList
+  claims were reworded to match its docs, and the AppState focus and blur
+  note was proven.
+- Chapter 18 (`17-Testing-React-Native-Apps.md`): unit and component
+  tests, end-to-end tools, a dated history from 2015 to 2026, device
+  clouds and CI, and agentic AI with MCP servers. Proofs run: a Jest and
+  Testing Library test, Maestro `check-syntax` on two flows, a CI YAML
+  parse, and `tools/list` on four MCP servers.
+
+### Known open items
+
+- Body headings count 1 to 16. File names and the frontmatter `chapter`
+  field count from 00. This offset is by design.
+- Code samples were not recompiled. Generated codegen output was not
+  re-run for chapters 4 and 5.
+- Third-party benchmark numbers were not re-measured.
+- Nitro 1.0 alpha was not diffed.
+- Chapter 18: no proof that Detox works on RN 0.88. Its README lists 0.77
+  to 0.84, and two issues about RN 0.85 stay open. No test ran on a real
+  device or simulator. Cloud pricing cells and the Sauce Labs, mabl and QA
+  Wolf claims are unverified. Calabash and Frank dates are unverified.
+- Chapter 17: the Hermes sampling profiler has no docs page, so that claim
+  stays marked unverified. The Expo SDK 58 upgrade guide was not fetched.
+
+---
+
 ## [0.87.0-rc.3] - 2026-07-28
 
 Source-grounded refresh against React Native `main` at

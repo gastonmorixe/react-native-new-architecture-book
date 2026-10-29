@@ -2,18 +2,18 @@
 title: "Migration and adoption"
 chapter: "06"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, migration, adoption, turbomodules, fabric, codegen]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:15:55-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Major correction: opt-out of the New Architecture was REMOVED in RN 0.82 on both platforms; chapter previously implied opt-out is still supported. Added notes on RCTReactNativeFactory deprecating RCTAppDelegate, the RCT_REMOVE_LEGACY_ARCH build flag, the diff-based shape of updateProps, and a concrete codegenConfig example. See _verification/chapters/06-migration/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Template iOS snippet replaced with the SceneDelegate-based template (UIScene), RCTTurboModuleEnabled now deleted, RCT_REMOVE_LEGACY_*_INTEROP opt-in from CocoaPods/SwiftPM (0.88), AGP 9.2.1 / Kotlin 2.3.21 / Gradle 9.4.1 values, TurboModule type location (ReactNativeApi.d.ts), jest-preset package, Node engines range, fixed line refs and Hermes V1 note."
 ---
 
 # Chapter 7: Migration and Adoption
@@ -32,7 +33,7 @@ Understanding the new architecture is the first step; the next is adopting it. F
 
 **Important Note:** Opt-out of the New Architecture was removed in React Native 0.82.[^7] On Android, setting `newArchEnabled=false` in `gradle.properties` is force-overridden to `true` by the React Gradle plugin and logs an error.[^8] On iOS, setting `RCT_NEW_ARCH_ENABLED=0` in your Podfile or shell prints a warning ("is not supported anymore since React Native 0.82") and then gets overwritten to `"1"` inside `use_react_native!` itself.[^9] If you must keep the legacy bridge for a project, pin to the last 0.81.x release and plan a real migration before upgrading further.
 
-On the v0.87 line the hard-wiring goes further: TurboModules are always enabled (`useTurboModules` feature flag removed; `RCTTurboModuleEnabled()` always returns `YES`).[^17] Separately, legacy module / component interop can be **compiled out** behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` — those macros are opt-in today (OSS apps still ship the interop shims unless they define the flags; iOS defaults only `RCT_REMOVE_LEGACY_ARCH=1`). Large chunks of iOS legacy architecture code guarded by `RCT_REMOVE_LEGACY_ARCH` have already been deleted from the tree. Android tooling has also moved: AGP v9, Gradle 9.4.x, min Kotlin 2.0+, app `compileSdk` 37, and libraries must use `compileSdk` ≥ 34 (`minCompileSdk = 34`).[^18] Node.js ≥ 22.13.0 is required. React Native's default JavaScript API is now the Strict TypeScript API (opt out temporarily with Metro `customConditions: ["react-native-legacy-deep-imports"]`).[^19] Legacy Hermes C++ / `hermesV1Enabled` opt-in paths were removed; the current Hermes build is the only supported engine path.[^20] iOS also ships a SwiftPM / prebuilt-Core story (React.xcframework + ReactNativeHeaders) that library authors should account for when consuming headers.
+From v0.87 the hard-wiring goes further: TurboModules are always enabled (`useTurboModules` feature flag removed; the iOS `RCTTurboModuleEnabled()` function was first made always-`YES` and is now deleted from `RCTBridge.h` on main).[^17] Separately, legacy module / component interop can be **compiled out** behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`. Those macros are opt-in today: since v0.88 you can set them from CocoaPods (`ENV['RCT_REMOVE_LEGACY_MODULE_INTEROP'] = '1'`) or SwiftPM. Both default to off, and the changelog says they will become the default in a future release. iOS defaults only `RCT_REMOVE_LEGACY_ARCH=1`. Large chunks of iOS legacy architecture code guarded by `RCT_REMOVE_LEGACY_ARCH` have already been deleted from the tree. Android tooling has also moved: AGP v9 (9.2.1 in `libs.versions.toml` on main), Gradle 9.4.1, min Kotlin 2.0+ (the repo builds with 2.3.21), app `compileSdk` 37, and libraries must use `compileSdk` ≥ 34 (`minCompileSdk = 34`).[^18] Node.js `^22.13.0 || ^24.3.0 || >= 26.0.0` is required (`packages/react-native/package.json` `engines`). React Native's default JavaScript API is now the Strict TypeScript API (opt out temporarily with Metro `customConditions: ["react-native-legacy-deep-imports"]`).[^19] Legacy Hermes C++ / `hermesV1Enabled` opt-in paths were removed. Hermes V1 is the only supported engine path (`react_native_pods.rb:132-133` still sets `RCT_HERMES_V1_ENABLED=1` for backward compatibility).[^20] iOS also ships a SwiftPM / prebuilt-Core story (React.xcframework + ReactNativeHeaders) that library authors should account for when consuming headers.
 
 ### 0.87 JS / tooling breakages to sweep
 
@@ -42,10 +43,10 @@ Before or while upgrading, search the app and tests for these removals:
 |---|---|
 | `InteractionManager` | `requestIdleCallback` (RuntimeScheduler idle tier) |
 | `'react-native/Libraries/Core/InitializeCore'` | `'react-native/setup-env'` |
-| `react-native/jest-preset` (subpath) | `preset: '@react-native/jest-preset'` |
+| `react-native/jest-preset` (subpath) | `preset: '@react-native/jest-preset'` (package at `packages/jest-preset`) |
 | Deep `Libraries/...` / `src/private/...` imports | Public `'react-native'` exports (or temporary `react-native-legacy-deep-imports`) |
 
-The legacy bridge classes that remain carry `[[deprecated("This API will be removed along with the legacy architecture.")]]` markers, and the iOS build continues to exclude them via the `RCT_REMOVE_LEGACY_ARCH=1` compiler flag.[^5][^10] Plan for them to disappear entirely.
+The legacy bridge classes that remain carry `[[deprecated("This API will be removed along with the legacy architecture.")]]` markers, and the iOS build continues to exclude them via the `RCT_REMOVE_LEGACY_ARCH=1` compiler flag (default on).[^5][^10] Plan for them to disappear entirely.
 
 This chapter is a practical guide to enabling the New Architecture and migrating legacy native modules and components. For the canonical, always-current guide, refer to the official React Native documentation.[^1]
 
@@ -75,7 +76,7 @@ Keep the `android/gradle.properties` flag in sync with the template:
 newArchEnabled=true
 ```
 
-On RN 0.76 through 0.81, flipping the flag to `false` is a valid temporary escape hatch while waiting on a dependency update. From RN 0.82 onward, the React Gradle plugin rejects that value. The relevant code lives in `ReactRootProjectPlugin.checkLegacyArchProperty` and the subproject loop above it: any `false` value is logged as an error ("Setting `newArchEnabled=false` in your `gradle.properties` file is not supported anymore since React Native 0.82") and the extra properties are force-set back to `"true"` for every subproject.[^8]
+On RN 0.76 through 0.81, flipping the flag to `false` is a valid temporary escape hatch while waiting on a dependency update. From RN 0.82 onward, the React Gradle plugin rejects that value. The relevant code lives in `ReactRootProjectPlugin.checkLegacyArchProperty`, and `apply` also force-sets the properties to `"true"` for every subproject. Any `false` value is logged as an error ("Setting `newArchEnabled=false` in your `gradle.properties` file is not supported anymore since React Native 0.82").[^8]
 
 **For iOS:**
 
@@ -104,38 +105,39 @@ On RN 0.82+, both forms (Podfile-side `ENV` write and `RCT_NEW_ARCH_ENABLED=0 bu
 
 ### iOS AppDelegate: `RCTAppDelegate` is deprecated
 
-`RCTAppDelegate` still exists but is marked deprecated at the class level: "RCTAppDelegate is deprecated and will be removed in a future version of React Native. Use `RCTReactNativeFactory` instead."[^11] The current template wires `RCTReactNativeFactory` directly from an `@main` Swift `AppDelegate`:
+`RCTAppDelegate` still exists but is marked deprecated at the class level: "RCTAppDelegate is deprecated and will be removed in a future version of React Native. For UIScene apps implement your own SceneDelegate with RCTReactNativeFactory; otherwise use RCTReactNativeFactory."[^11] The current template (`private/helloworld`) uses the UIScene lifecycle. The `@main` `AppDelegate` is empty, and a `SceneDelegate` that subclasses `RCTDefaultReactNativeFactoryDelegate` creates the `RCTReactNativeFactory`. Apps that stay AppDelegate-only can still call `startReactNative(withModuleName:in:launchOptions:)` on the factory, as the older template did.
 
 ```swift
-import React_RCTAppDelegate
+// SceneDelegate.swift (current template)
+import React
 import ReactAppDependencyProvider
+import React_RCTAppDelegate
+import UIKit
 
-@main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class SceneDelegate: RCTDefaultReactNativeFactoryDelegate, UIWindowSceneDelegate {
+  var window: UIWindow?
   var reactNativeFactory: RCTReactNativeFactory?
 
-  func application(_ application: UIApplication,
-                   didFinishLaunchingWithOptions launchOptions:
-                     [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-    let delegate = ReactNativeDelegate()
-    delegate.dependencyProvider = RCTAppDependencyProvider()
-    let factory = RCTReactNativeFactory(delegate: delegate)
-    reactNativeFactory = factory
+  func scene(_ scene: UIScene,
+             willConnectTo session: UISceneSession,
+             options connectionOptions: UIScene.ConnectionOptions) {
+    guard let windowScene = scene as? UIWindowScene else { return }
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-    factory.startReactNative(withModuleName: "HelloWorld",
-                              in: window,
-                              launchOptions: launchOptions)
-    return true
+    dependencyProvider = RCTAppDependencyProvider()
+    reactNativeFactory = RCTReactNativeFactory(delegate: self)
+    window = UIWindow(windowScene: windowScene)
+
+    reactNativeFactory?.startReactNative(
+      withModuleName: "HelloWorld",
+      in: window,
+      connectionOptions: connectionOptions)
   }
-}
 
-class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
   override func bundleURL() -> URL? { /* … */ }
 }
 ```
 
-If you are migrating an older app that subclasses `RCTAppDelegate`, that path still works (the deprecation is a warning, not an error), but plan to swap to `RCTReactNativeFactory` before the next major. The bridge-backed `createBridgeWithDelegate:` and `createRootViewWithBridge:` callbacks on both `RCTAppDelegate` and `RCTReactNativeFactoryDelegate` are themselves marked "will be removed when removing the legacy architecture."[^11]
+If you are migrating an older app that subclasses `RCTAppDelegate`, that path still works (the deprecation is a warning, not an error), but plan to swap to `RCTReactNativeFactory` before the next major. The bridge accessor on `RCTReactNativeFactory` is marked "The bridge is deprecated and will be removed when removing the legacy architecture."[^11]
 
 ## Step 2: Migrating a Legacy Native Module to a TurboModule
 
@@ -156,9 +158,9 @@ export interface Spec extends TurboModule {
 export default TurboModuleRegistry.getEnforcing<Spec>('MyModule');
 ```
 
-Import `TurboModule` and `TurboModuleRegistry` from the public `'react-native'` entry, not from the deep `Libraries/TurboModule/...` paths. The deep `TurboModuleRegistry.js` file exports `get` and `getEnforcing` as named functions, not a `TurboModuleRegistry` namespace, so `import { TurboModuleRegistry } from 'react-native/Libraries/TurboModule/TurboModuleRegistry'` does not typecheck. The `react-native` package re-exports the file as a namespace via `export * as TurboModuleRegistry` in `packages/react-native/types/index.d.ts:143`, which is the form RN's own type test at `packages/react-native/types/__typetests__/turbo-module-sample.ts:8` uses.[^12]
+Import `TurboModule` and `TurboModuleRegistry` from the public `'react-native'` entry, not from the deep `Libraries/TurboModule/...` paths. The deep `TurboModuleRegistry.js` file exports `get` and `getEnforcing` as named functions, not a `TurboModuleRegistry` namespace, so `import { TurboModuleRegistry } from 'react-native/Libraries/TurboModule/TurboModuleRegistry'` does not typecheck. The `react-native` package re-exports the file as a namespace via `export * as TurboModuleRegistry` in `packages/react-native/index.js.flow:443`. The Strict TypeScript snapshot declares `declare namespace TurboModuleRegistry { export { get_2 as get, getEnforcing } }` at `ReactNativeApi.d.ts:5406`. RN's own type test at `packages/react-native/__typetests__/turbo-module-sample.ts:10` uses the public import.[^12]
 
-The `TurboModule` base interface is just `{ getConstants?(): {} }` (see `Libraries/TurboModule/RCTExport.d.ts:10-12`), so the codegen pipeline treats any spec extending it as a candidate for native-side stub generation. `TurboModuleRegistry.getEnforcing<Spec>(name)` returns `Spec` (not `Spec | null`) and throws if the native module is missing; use `get<Spec>(name)` if a null return is preferable to a hard failure.[^12]
+The `TurboModule` base interface is just `{ getConstants?: () => {} }` (see `ReactNativeApi.d.ts:1857-1859` and `5405`: `TurboModule extends DEPRECATED_RCTExport<void>`), so the codegen pipeline treats any spec extending it as a candidate for native-side stub generation. `TurboModuleRegistry.getEnforcing<Spec>(name)` returns `Spec` (not `Spec | null`) and throws if the native module is missing; use `get<Spec>(name)` if a null return is preferable to a hard failure.[^12]
 
 **2. Configure CodeGen**
 
@@ -242,16 +244,16 @@ A critical part of the migration is to check third-party libraries that use nati
 [^5]: React Native source: the literal string `"This API will be removed along with the legacy architecture."` appears as a `[[deprecated(...)]]` marker across the legacy bridge stack. Representative examples: `packages/react-native/ReactCommon/cxxreact/Instance.h`, `cxxreact/JSExecutor.h`, `cxxreact/NativeToJsBridge.h`, `cxxreact/ModuleRegistry.h`, `jsiexecutor/jsireact/JSIExecutor.h`. On the iOS app shell, `RCTAppDelegate` ("Use `RCTReactNativeFactory` instead.") and bridge accessors on `RCTReactNativeFactory` carry related deprecations. `RCTArchConfiguratorProtocol` was removed from public headers on the v0.87 line.
 [^6]: RN 0.76.0 release notes (entry `## v0.76.0` in `CHANGELOG-0.7x.md`): "TurboModules will be looked up as TurboModules first, and fallback to legacy modules after." Default-on rollout discussion: [https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture](https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture).
 [^7]: RN 0.82.0 changelog (`CHANGELOG.md`, section `## v0.82.0`): "Remove possibility to newArchEnabled=false in 0.82" (commit `d5d21d0614`); "Removed the opt-out from the New Architecture" (commit `83e6eaf693`); "Crash the app if they force the legacy architecture" (commit `dc132a4fd4`). Tag `v0.82.0` was cut on 2025-10-07 (`06c4c425d7a`).
-[^8]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt:21-86`: the plugin's `apply` body force-sets `NEW_ARCH_ENABLED` and `SCOPED_NEW_ARCH_ENABLED` to `"true"` for every subproject, and `checkLegacyArchProperty` logs the "not supported anymore since React Native 0.82" error if the project tried to disable it.
-[^9]: `packages/react-native/scripts/react_native_pods.rb:474-490` (`warn_if_new_arch_disabled`), called at line 76 inside `use_react_native!`. Line 116 then unconditionally does `ENV["RCT_NEW_ARCH_ENABLED"] = "1"`. The reusable hardcoded source-of-truth is `packages/react-native/scripts/cocoapods/new_architecture.rb:162-164`: `def self.new_arch_enabled; return true; end`.
-[^10]: `packages/react-native/scripts/react_native_pods.rb:94-96` (`ENV['RCT_REMOVE_LEGACY_ARCH'] = ENV['RCT_REMOVE_LEGACY_ARCH'] == '0' ? '0' : '1'`) and lines 557-560 wire `-DRCT_REMOVE_LEGACY_ARCH=1` into the Pods project's compiler flags.
-[^11]: `packages/react-native/Libraries/AppDelegate/RCTAppDelegate.h:22-24, 62-73`; `packages/react-native/Libraries/AppDelegate/RCTReactNativeFactory.h:34-43, 61-115`. The template Swift `AppDelegate` is at `private/helloworld/ios/HelloWorld/AppDelegate.swift` (current `main`).
-[^12]: `packages/react-native/Libraries/TurboModule/RCTExport.d.ts:10-12` defines the public `TurboModule` interface. `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.d.ts:12-13` and `TurboModuleRegistry.js:35-47` define `get<T>(name)` (nullable) and `getEnforcing<T>(name)` (throws on miss). The internal `requireModule` falls back to the legacy `NativeModules` map when `global.__turboModuleProxy` is unavailable, which is the interop path mentioned in the 0.76 changelog.
-[^13]: A real `codegenConfig` block lives at `packages/react-native-popup-menu-android/package.json:39-50`. CodeGen reads it via `packages/react-native/scripts/codegen/generate-artifacts-executor/generateRCTModuleProviders.js:49`. Allowed `type` values are `modules`, `components`, and `all`.
-[^14]: Prefer `import { codegenNativeComponent } from 'react-native'`. The implementation still lives at `packages/react-native/Libraries/Utilities/codegenNativeComponent.js:34-73`; under Strict TS API, deep `Libraries/...` types are null unless you set `customConditions: ["react-native-legacy-deep-imports"]`.
+[^8]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt:22-86`: the plugin's `apply` body force-sets `NEW_ARCH_ENABLED` and `SCOPED_NEW_ARCH_ENABLED` to `"true"` for every subproject, and `checkLegacyArchProperty` logs the "not supported anymore since React Native 0.82" error if the project tried to disable it.
+[^9]: `packages/react-native/scripts/react_native_pods.rb:544-558` (`warn_if_new_arch_disabled`), called at line 100 inside `use_react_native!`. Line 148 then unconditionally does `ENV["RCT_NEW_ARCH_ENABLED"] = "1"`. The reusable hardcoded source-of-truth is `packages/react-native/scripts/cocoapods/new_architecture.rb:172-174`: `def self.new_arch_enabled; return true; end`.
+[^10]: `packages/react-native/scripts/react_native_pods.rb:120` (`ENV['RCT_REMOVE_LEGACY_ARCH'] = ENV['RCT_REMOVE_LEGACY_ARCH'] == '0' ? '0' : '1'`) and lines 627-631 wire `-DRCT_REMOVE_LEGACY_ARCH=1` into the Pods project's compiler flags.
+[^11]: `packages/react-native/Libraries/AppDelegate/RCTAppDelegate.h:22-24, 59-60`; `packages/react-native/Libraries/AppDelegate/RCTReactNativeFactory.h:65-97, 111`. The template Swift files are `private/helloworld/ios/HelloWorld/AppDelegate.swift` (empty `@main` class) and `SceneDelegate.swift` (SceneDelegate support added in `7bfe32fd331`).
+[^12]: `packages/react-native/ReactNativeApi.d.ts:1857-1859, 5405-5408` defines the public `TurboModule` interface and `TurboModuleRegistry` namespace (the per-file `RCTExport.d.ts` and `TurboModuleRegistry.d.ts` were deleted from `Libraries/TurboModule/` since the last refresh). `TurboModuleRegistry.js:35-47` defines `get<T>(name)` (nullable) and `getEnforcing<T>(name)` (throws on miss). The internal `requireModule` falls back to the legacy `NativeModules` map when `global.__turboModuleProxy` is unavailable, which is the interop path mentioned in the 0.76 changelog.
+[^13]: A real `codegenConfig` block lives at `packages/react-native-popup-menu-android/package.json:43-54`. CodeGen reads it via `packages/react-native/scripts/codegen/generate-artifacts-executor/generateRCTModuleProviders.js:49`. Allowed `type` values are `modules`, `components`, and `all`.
+[^14]: Prefer `import { codegenNativeComponent } from 'react-native'`. The implementation still lives at `packages/react-native/Libraries/Utilities/codegenNativeComponent.js:40-73` (options type at lines 19-26); under Strict TS API, deep `Libraries/...` types are null unless you set `customConditions: ["react-native-legacy-deep-imports"]`.
 [^15]: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h:25-77`. Working diff-style example: `packages/react-native/React/Fabric/Mounting/ComponentViews/Switch/RCTSwitchComponentView.mm:70-104`.
 [^16]: React Native Directory (community-maintained compatibility tracker). [https://reactnative.directory/](https://reactnative.directory/)
-[^17]: CHANGELOG v0.87.0-rc.0: "Remove the `useTurboModules` feature flag. TurboModules are now always enabled." (`b4a715ca1f`). iOS: `RCTTurboModuleEnabled` / `RCTEnableTurboModule` deprecated in `RCTBridge.h:50-53`, always-YES / no-op in `RCTBridge.mm:189-197` (`aee4a2586e`, `feede1422b`).
-[^18]: CHANGELOG v0.87.0-rc.0: "Adopt AGP v9" (`abb071b135`); "Require Node.js >= 22.13.0" (`a0d39e7a9c`); "Gradle to 9.4.1" (`c0ee408c16`); "Bumped min Kotlin version to 2.0+" (`ec1e1ae054`); "Update `compileSdk` and `buildTools` to 37" (`3e8dfb1e64`); "Set minCompileSdk to 34" (`29e5f954c7`).
-[^19]: CHANGELOG v0.87.0-rc.1: "React Native's default JavaScript API is now the Strict TypeScript API. Use `customConditions: [\"react-native-legacy-deep-imports\"]` to opt out." (`c948b61c05`).
-[^20]: CHANGELOG v0.87.0-rc.0: "Remove Legacy Hermes from C++ code" (`f9476256bd`); "Remove hermesV1Enabled and simplify the code" (`0a5c8c6b4b`); "Remove the RCT_HERMES_V1_ENABLED from Cocoapods" (`940ee8ae0d`). Also: InteractionManager removed (`ed893f7d98`); InitializeCore → `setup-env` (`bfa679f0ea`); jest-preset package form (`9ee21ddd9b`).
+[^17]: CHANGELOG v0.87.0: "Remove the `useTurboModules` feature flag. TurboModules are now always enabled." (`b4a715ca1f`). iOS: `RCTTurboModuleEnabled` / `RCTEnableTurboModule` were deprecated and always-YES / no-op (`aee4a2586e`, `feede1422b`), then deleted from `RCTBridge.h` / `RCTBridge.mm` in `01d55273bcf` (2026-10-27, on main after v0.88.1). The `newArchEnabled:` initializers of `RCTRootViewFactoryConfiguration` are deprecated and ignored.
+[^18]: CHANGELOG v0.87.0: "Adopt AGP v9" (`abb071b135`); "Require Node.js >= 22.13.0" (`a0d39e7a9c`); "Gradle to 9.4.1" (`c0ee408c16`); "Bumped min Kotlin version to 2.0+" (`ec1e1ae054`); "Update `compileSdk` and `buildTools` to 37" (`3e8dfb1e64`); "Set minCompileSdk to 34" (`29e5f954c7`, `ReactAndroid/build.gradle.kts:595`). Versions on main: `packages/react-native/gradle/libs.versions.toml` (`agp = "9.2.1"`, `kotlin = "2.3.21"`, `compileSdk = "37"`), `gradle/wrapper/gradle-wrapper.properties` (Gradle 9.4.1).
+[^19]: CHANGELOG v0.87.0: "React Native's default JavaScript API is now the Strict TypeScript API. Use `customConditions: [\"react-native-legacy-deep-imports\"]` to opt out." (`c948b61c05`).
+[^20]: CHANGELOG v0.87.0: "Remove Legacy Hermes from C++ code" (`f9476256bd`); "Remove hermesV1Enabled and simplify the code" (`0a5c8c6b4b`); "Remove the RCT_HERMES_V1_ENABLED from Cocoapods" (`940ee8ae0d`). Also: InteractionManager removed (`ed893f7d98`); InitializeCore → `setup-env` (`bfa679f0ea`); jest-preset package form (`9ee21ddd9b`).

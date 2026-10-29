@@ -2,18 +2,18 @@
 title: "Case Study - react-native-vision-camera"
 chapter: "12"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable. main is 795 commits past it."
 tags: [react-native, new-architecture, case-study, vision-camera, jsi, host-object, frame-processor, worklets, nitro, third-party]
 audit:
   status: "verified"
@@ -25,6 +25,7 @@ taillog:
   - "2026-05-23T16:13:51-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db) and Vision Camera v4.7.2 / v5.0.x. See _verification/chapters/12-vision-camera/report.md."
   - "2026-05-23T19:59:32-0400 | Recheck pass against VC clone HEAD 5a07d7ae (v5.0.10+7). Repo restructured to packages/ monorepo since v1 audit; v4 paths still resolve via `git show v4.7.2:...`. Fixed three v1 footnote bugs (worklets-plugin docs path, Android FrameHostObject.cpp:22 line number, TurboModule TODO count 7-not-4). Added V5 PR commit pin (30a8b5de) and v5 Frame.nitro.ts citation. See _verification/recheck/vc/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Added Vision Camera v5.2.4 snapshot (Nitro 0.37.0 pin, optional nitro peer dep, 5.x release line). Updated interop status to 0.88 (macros opt-in, default off, iOS OSS opt-in via CocoaPods/SwiftPM). Fixed Frame.nitro.ts line cite."
 ---
 
 # Chapter 13: Case Study - `react-native-vision-camera`
@@ -34,7 +35,7 @@ To understand how the New Architecture meets real-world code, we will analyze `r
 This case study tracks two snapshots:
 
 -   **v4.7.2** (2025-09-02), the last release of the v4 line, contemporary with the original drafting of this book. The deep-dive below is grounded in this version.[^vc-v472]
--   **v5.0.0** (2026-04-16), a full rewrite onto Nitro Modules.[^vc-v500] Chapter 13 covers Nitro in depth, so here we only note what changed and why.
+-   **v5.0.0** (2026-04-16), a full rewrite onto Nitro Modules.[^vc-v500] The 5.x line has moved on since. The current release is **v5.2.4** (2026-10-29), which pins `nitrogen` and `react-native-nitro-modules` to 0.37.0 and lists `react-native-nitro-modules` as an optional peer dependency.[^vc-v524] Chapter 13 covers Nitro in depth, so here we only note what changed and why.
 
 ## What "New Architecture support" actually means in v4
 
@@ -46,7 +47,7 @@ The v4 line is the version everyone migrating to Fabric and Bridgeless had to ma
 
 So the right one-liner is: in v4, Vision Camera *runs under* Fabric and Bridgeless because RN's interop layer wraps legacy modules and view managers. It is not itself Fabric or TurboModule code.
 
-**Status as of RN 0.87:** that interop path is no longer an open-ended compatibility promise. Legacy module and view-manager shims are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` and `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` — builds that define those macros drop the wrappers entirely.[^rn-interop] A library that only "supports New Arch via interop" is on a deletion track; the durable path is a real TurboModule / Fabric component (or, as v5 did, Nitro).
+**Status as of RN 0.88:** that interop path is no longer an open-ended compatibility promise. Legacy module and view-manager shims are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` and `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` — builds that define those macros drop the wrappers entirely. Both macros default to off and iOS apps can opt in from CocoaPods and SwiftPM. The changelog says they will become the default in a future release.[^rn-interop] A library that only "supports New Arch via interop" is on a deletion track; the durable path is a real TurboModule / Fabric component (or, as v5 did, Nitro).
 
 ## Advanced JSI: The Frame Processor
 
@@ -134,7 +135,7 @@ For this book, the v4 case study is still the more instructive one. It shows how
 
 ## Conclusion
 
-`react-native-vision-camera` demonstrates two things at once. First, that "supports the New Architecture" can historically mean nothing more than "runs under the interop layer" — v4 shipped that way successfully, but on RN 0.87 those shims are compile-gated for removal, so interop-only libraries should treat migration as urgent rather than optional. Second, that JSI is the part of the New Architecture you actually feel as a user. A `jsi::HostObject` (v4) or Nitro `HybridObject` (v5) exposing a camera frame to a worklet, on a dedicated thread, is the kind of capability you cannot build on top of the legacy bridge no matter how hard you try. V5's Nitro rewrite is the surviving production path; the v4 interop story is the cautionary one.
+`react-native-vision-camera` demonstrates two things at once. First, that "supports the New Architecture" can historically mean nothing more than "runs under the interop layer" — v4 shipped that way successfully, but on RN 0.88 those shims are compile-gated for removal, so interop-only libraries should treat migration as urgent rather than optional. Second, that JSI is the part of the New Architecture you actually feel as a user. A `jsi::HostObject` (v4) or Nitro `HybridObject` (v5) exposing a camera frame to a worklet, on a dedicated thread, is the kind of capability you cannot build on top of the legacy bridge no matter how hard you try. V5's Nitro rewrite is the surviving production path; the v4 interop story is the cautionary one.
 
 ---
 
@@ -152,7 +153,7 @@ For this book, the v4 case study is still the more instructive one. It shows how
 
 [^vc-androidviewmanager]: `tmp/react-native-vision-camera/package/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt:19` (`class CameraViewManager : ViewGroupManager<CameraView>()`). Props are declared with `@ReactProp`.
 
-[^rn-interop]: RN provides automatic interop wrappers so that legacy view managers and bridge modules keep working when the host app enables Fabric and Bridgeless — **until those wrappers are compiled out**. The view-side wrapper lives under `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` and is gated by `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`; the module-side wrapper is `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.{h,mm}`, gated by `RCT_REMOVE_LEGACY_MODULE_INTEROP` (CHANGELOG v0.87.0-rc.0: `9885fe95ef`, `3278f309e2`).
+[^rn-interop]: RN provides automatic interop wrappers so that legacy view managers and bridge modules keep working when the host app enables Fabric and Bridgeless — **until those wrappers are compiled out**. The view-side wrapper lives under `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` and is gated by `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`; the module-side wrapper is `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.{h,mm}`, gated by `RCT_REMOVE_LEGACY_MODULE_INTEROP` (CHANGELOG v0.87.0: `9885fe95ef`, `3278f309e2`). The iOS opt-in is in CHANGELOG v0.88.0 (`b933d18177`, "Both default to off and will become the default in a future release"). The CocoaPods switch is `ENV['RCT_REMOVE_LEGACY_MODULE_INTEROP']` in `packages/react-native/scripts/react_native_pods.rb:123`.
 
 [^vc-androidmodule]: `tmp/react-native-vision-camera/package/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt:39` (`class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext)`). Methods are annotated `@ReactMethod`, the legacy bridge contract.
 
@@ -178,6 +179,8 @@ For this book, the v4 case study is still the more instructive one. It shows how
 
 [^vc-videoFrameCallback]: `tmp/react-native-vision-camera/package/ios/Core/CameraSession.swift:268-294` (`captureOutput(_:didOutput:from:)` → `onVideoFrame(...)` → `delegate.onFrame(...)`).
 
-[^vc-v5frame]: V5 `Frame` is a Nitro `HybridObject` spec, not a `jsi::HostObject`: `tmp/react-native-vision-camera/packages/react-native-vision-camera/src/specs/instances/Frame.nitro.ts:73-99` (`interface Frame extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> { readonly width: number; readonly height: number; readonly pixelFormat: PixelFormat; ... getPlanes(): FramePlane[]; getPixelBuffer(): ArrayBuffer; getNativeBuffer(): NativeBuffer; ... }`). The Nitro tool generates the JSI and JNI bindings from this spec; no hand-written `HostObject` survives. `git grep -l 'FrameHostObject' HEAD` returns empty at the v5 working tree.
+[^vc-v5frame]: V5 `Frame` is a Nitro `HybridObject` spec, not a `jsi::HostObject`: `tmp/react-native-vision-camera/packages/react-native-vision-camera/src/specs/instances/Frame.nitro.ts:101` (`interface Frame extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> { readonly width: number; readonly height: number; readonly pixelFormat: PixelFormat; ... getPlanes(): FramePlane[] (line 289); getPixelBuffer(): ArrayBuffer (line 68); getNativeBuffer(): NativeBuffer (line 377); ... }`). The Nitro tool generates the JSI and JNI bindings from this spec; no hand-written `HostObject` survives. `git grep -l 'FrameHostObject' HEAD` returns empty at the v5 working tree.
 
 [^vc-v5worklets-pkg]: `tmp/react-native-vision-camera/packages/react-native-vision-camera-worklets/package.json` (peerDeps include `"react-native-worklets": "*"`, not `react-native-worklets-core`). The v5 example babel config is `tmp/react-native-vision-camera/apps/simple-camera/babel.config.js:3` (`plugins: ['react-native-worklets/plugin']`). The main `react-native-vision-camera@5.x` package's peer deps are `react-native-nitro-modules` and `react-native-nitro-image`; worklets is opt-in via the sibling package.
+
+[^vc-v524]: `tmp/react-native-vision-camera/packages/react-native-vision-camera/package.json` (`"version": "5.2.4"`, `nitrogen` and `react-native-nitro-modules` devDependencies `0.37.0`, optional `react-native-nitro-modules` peer dependency). Tag `v5.2.4` is commit `cd95a93a`, 2026-10-29. Nitro bump history since v5.0.10: 0.35.9 (`49d94e7f`), 0.36.1 (`8004ceec`), 0.36.3 to 0.36.5, then 0.37 (`a4acf4d4`, 2026-08-20). The Nitro clone `tmp/nitro` has stable tag `v0.37.1` (2026-08-27) and `v1.0.0-alpha` nightlies on main. The `react-native-vision-camera-worklets` package pins `react-native-worklets` 0.9.1 as a devDependency.

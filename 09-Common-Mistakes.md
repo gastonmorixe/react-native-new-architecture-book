@@ -2,18 +2,18 @@
 title: "Common mistakes and misunderstandings"
 chapter: "09"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable. Main is 795 commits past it."
 tags: [react-native, new-architecture, common-mistakes, jsi, turbomodules, fabric, codegen, bridgeless]
 audit:
   status: "verified"
@@ -24,20 +24,21 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:14:30-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). See _verification/chapters/09-common-mistakes/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Re-verified all citations. Fixed shifted line numbers (RCTTurboModule.h, RCTMountingManager.mm, RCTViewComponentView.mm, ReactPlugin.kt, TurboModule.h). Updated version context to 0.88.1. Noted legacy iOS bridge removal in 0.87."
 ---
 
 # Chapter 10: Common Mistakes and Misunderstandings
 
 The New Architecture introduces powerful concepts, but also new ways for things to go wrong. Understanding common pitfalls can save significant debugging time. This chapter outlines frequent mistakes and misunderstandings grouped by component.
 
-(Version context: starting with v0.76, Fabric, TurboModules, and Bridgeless are the defaults. The mistakes below assume an app on v0.76 or newer. On the v0.87 line, TurboModules are always on, opt-out is long gone (since 0.82), and the interop paths described below are still present but increasingly behind `RCT_REMOVE_LEGACY_*` compile gates.)
+(Version context: starting with v0.76, Fabric, TurboModules, and Bridgeless are the defaults. The mistakes below assume an app on v0.76 or newer. On the v0.87 and v0.88 lines, TurboModules are always on, opt-out is long gone (since 0.82), and the interop paths described below are still present but behind `RCT_REMOVE_LEGACY_*` compile gates. The legacy iOS bridge sources (for example `RCTCxxBridge.mm`) were removed from main in 0.87.)
 
 ## General Misunderstandings
 
 **Mistake: Assuming the New Architecture automatically makes existing code faster.**
 
 -   **Why it's a mistake:** Shipping on the New Architecture (the only option on RN ≥ 0.82) does not by itself optimize legacy components. An old, Bridge-based native module will still communicate via a compatibility layer. The performance benefits are only realized when a module is migrated to a TurboModule or a component to a Fabric Component.
--   **How to avoid:** Understand that performance gains require active migration of your native code to use the new, JSI-based APIs. The Android-side compatibility shim is the `InteropModuleRegistry`, gated behind the `useFabricInterop()` feature flag. It is annotated `@InteropLegacyArchitecture` in the source, which is a strong signal that this is a migration crutch rather than a long-term performance path — and on 0.87 the C++/platform interop surfaces are themselves compile-optional behind `RCT_REMOVE_LEGACY_*_INTEROP`.[^4]
+-   **How to avoid:** Understand that performance gains require active migration of your native code to use the new, JSI-based APIs. The Android-side compatibility shim is the `InteropModuleRegistry`, gated behind the `useFabricInterop()` feature flag. It is annotated `@InteropLegacyArchitecture` in the source, which is a strong signal that this is a migration crutch rather than a long-term performance path — and on 0.87 and later the C++/platform interop surfaces are themselves compile-optional behind `RCT_REMOVE_LEGACY_*_INTEROP`.[^4]
 
 **Mistake: Ignoring third-party library compatibility.**
 
@@ -96,20 +97,20 @@ The New Architecture introduces powerful concepts, but also new ways for things 
 
 **Citations:**
 
-[^1]: "Turbo Native Modules". React Native Documentation. [https://reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction). The exact `invariant` message is in `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.js:39-47`.
-[^2]: "Fabric Native Components: iOS". React Native Documentation. [https://reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction). The protocol declaring `updateProps:oldProps:` and `handleCommand:args:` is `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:66-71, 96-98`.
+[^1]: "Turbo Native Modules". React Native Documentation. [https://reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction). The exact `invariant` message is in `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.js:40-47`.
+[^2]: "Fabric Native Components: iOS". React Native Documentation. [https://reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction). The protocol declaring `updateProps:oldProps:` and `handleCommand:args:` is `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:67-68, 95`.
 [^3]: "Using Codegen". React Native Documentation. [https://reactnative.dev/docs/next/the-new-architecture/using-codegen](https://reactnative.dev/docs/next/the-new-architecture/using-codegen).
 [^4]: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/bridge/interop/InteropModuleRegistry.kt:15-52`. The class is annotated `@InteropLegacyArchitecture` and only returns modules when `useFabricInterop()` is true.
 [^5]: `packages/react-native/Libraries/ReactNative/BridgelessUIManager.js:22-101`. Many UIManager APIs (`measure`, `measureLayout`, `measureInWindow`, etc.) call `raiseSoftError(methodName)` which logs `'<methodName>' is not available in the new React Native architecture`.
-[^6]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h:25-46`. `TurboModule` extends `jsi::HostObject` (line 46). `TurboModuleMethodValueKind` enumerates the supported return shapes including `PromiseKind` (line 33).
+[^6]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h:27-49`. `TurboModule` extends `jsi::HostObject` (line 49). `TurboModuleMethodValueKind` enumerates the supported return shapes including `PromiseKind` (line 35).
 [^7]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:687-704`. The `Runtime` class header comment is the canonical statement about JSI thread safety.
-[^8]: `packages/react-native/ReactCommon/jsi/jsi/threadsafe.h:18-23`. `ThreadSafeRuntime` is a `Runtime` subclass with `virtual void lock() const = 0; virtual void unlock() const = 0; virtual Runtime& getUnsafeRuntime() = 0;`.
+[^8]: `packages/react-native/ReactCommon/jsi/jsi/threadsafe.h:18-23`. `ThreadSafeRuntime` (lines 18-22) is a `Runtime` subclass with `virtual void lock() const = 0; virtual void unlock() const = 0; virtual Runtime& getUnsafeRuntime() = 0;`.
 [^9]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:222-233`. The `HostObject` destructor comment is the source-of-truth for the GC/thread/safety constraints.
 [^10]: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/BaseReactPackage.kt:22-41`. `BaseReactPackage` is the modern parent class. The older `ReactPackage.createNativeModules` is now `@Deprecated` (see `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/ReactPackage.kt:36-38`).
-[^11]: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.h:178-185`. The `RCTModuleProvider` protocol declares `- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params;`.
-[^12]: `packages/react-native/React/Fabric/Mounting/RCTMountingManager.mm:110-115`. The mount manager only calls `updateProps:` when `oldChildShadowView.props != newChildShadowView.props` (pointer equality on the immutable shared `Props`).
-[^13]: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:107-112`. `- (void)prepareForRecycle;` is documented as "Called right after the component view is moved to a recycle pool. Receiver must reset any local state and release associated non-reusable resources." A real implementation example: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:687-726`.
+[^11]: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.h:196-204`. The `RCTModuleProvider` protocol declares `- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params;`.
+[^12]: `packages/react-native/React/Fabric/Mounting/RCTMountingManager.mm:112-113`. The mount manager only calls `updateProps:` when `oldChildShadowView.props != newChildShadowView.props` (pointer equality on the immutable shared `Props`).
+[^13]: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:105-109`. `- (void)prepareForRecycle;` is documented as "Called right after the component view is moved to a recycle pool. Receiver must reset any local state and release associated non-reusable resources." A real implementation example: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:853-870`.
 [^14]: `packages/react-native/Libraries/Utilities/codegenNativeCommands.js:17-31`. The helper returns command-dispatch functions that call `dispatchCommand(ref, command, args)`. Real-world example: `packages/react-native/Libraries/Components/ScrollView/ScrollViewCommands.js:45-52` (`flashScrollIndicators`, `scrollTo`, `scrollToEnd`, `zoomToRect`).
 [^15]: `packages/react-native/scripts/cocoapods/codegen.rb:9-39`. `run_codegen!` wires `use_react_native_codegen_discovery!` into pod install.
-[^16]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt:264`. `project.tasks.named("preBuild", Task::class.java).dependsOn(generateCodegenArtifactsTask)`.
-[^17]: `packages/react-native/scripts/codegen/generate-artifacts-executor/generateSchemaInfos.js:29-33` (joins `library.libraryPath` and `library.config.jsSrcsDir`). See also `packages/react-native/package.json:197-231` (real `codegenConfig` example).
+[^16]: `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt:275`. `project.tasks.named("preBuild", Task::class.java).dependsOn(generateCodegenArtifactsTask)`.
+[^17]: `packages/react-native/scripts/codegen/generate-artifacts-executor/generateSchemaInfos.js:29-33` (joins `library.libraryPath` and `library.config.jsSrcsDir`). See also `packages/react-native/package.json:183-211` (real `codegenConfig` example).

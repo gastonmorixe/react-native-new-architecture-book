@@ -2,18 +2,18 @@
 title: "CodeGen - The Automation Engine"
 chapter: "04"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, codegen, turbo-modules, fabric, build-tools]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:17:30-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Corrected the TurboModule spec example (constants surfaced via getConstants, namespace import for TurboModuleRegistry), rewrote the generated-header example to match actual codegen output (three families: ObjC++ SpecJSI over a @protocol, JNI SpecJSI over a Java/Kotlin abstract class, and C++ CxxSpec template via CRTP), and added precise compile-time-safety mechanism. See _verification/chapters/04-codegen/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). ArrayBuffer now supported by Java/JNI generators (0.88), Promise<ArrayBuffer> rejected, ObjC emits RCTArrayBuffer on main (NSMutableData on v0.88.1), codegen discovery fixes, refreshed line refs."
 ---
 
 # Chapter 5: CodeGen - The Automation Engine
@@ -72,7 +73,7 @@ export interface Spec extends TurboModule {
 export default TurboModuleRegistry.getEnforcing<Spec>('MyModule');
 ```
 
-Two things worth noticing here. First, import from the public `'react-native'` entry — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/TurboModule/...` imports have `"types": null` unless you opt into `react-native-legacy-deep-imports`.[^9] Second, **a TurboModule spec interface may only contain function-typed properties (and non-nullable event emitters).** Bare data fields like `readonly PI: number;` are rejected at parse time with `UnsupportedModulePropertyParserError` ("TS interfaces extending TurboModule must only contain 'FunctionTypeAnnotation's or non nullable 'EventEmitter's").[^10] Constants are surfaced through the `getConstants` method whose return type carries the constant shape, which is exactly the pattern the canonical samples follow.[^11]
+Two things worth noticing here. First, import from the public `'react-native'` entry — under the Strict TypeScript API (default since v0.87.0), deep `Libraries/TurboModule/...` imports have `"types": null` unless you opt into `react-native-legacy-deep-imports`.[^9] Second, **a TurboModule spec interface may only contain function-typed properties (and non-nullable event emitters).** Bare data fields like `readonly PI: number;` are rejected at parse time with `UnsupportedModulePropertyParserError` ("TS interfaces extending TurboModule must only contain 'FunctionTypeAnnotation's or non nullable 'EventEmitter's").[^10] Constants are surfaced through the `getConstants` method whose return type carries the constant shape, which is exactly the pattern the canonical samples follow.[^11]
 
 **Step 2: CodeGen generates the C++ Spec Header.**
 
@@ -166,7 +167,7 @@ In every case the JS-to-native shape is fixed by the spec and re-validated at co
 
 ### Platform matrix for newer types (v0.87)
 
-Not every annotation lands on every generator. As of RN 0.87, `ArrayBuffer` / `ArrayBufferTypeAnnotation` is a first-class schema type and is emitted by the **C++** (`GenerateModuleH.js`) and **ObjC** (`GenerateModuleObjCpp`) generators — the C++ fixture even ships a `getArrayBuffer` / `voidArrayBuffer` sample in the snapshot tests.[^15] The **Java** and **JNI** generators still throw `"ArrayBuffer is only supported for C++ TurboModules."`[^16] So binary payloads over a Kotlin/Java TurboModule still need a pure-C++ module (or a non-`ArrayBuffer` encoding). Separately, pure-C++ TurboModules no longer require `includesGeneratedCode: true` in `codegenConfig` for Android autolinking to pick them up.[^17]
+Not every annotation lands on every generator. `ArrayBuffer` / `ArrayBufferTypeAnnotation` is a first-class schema type. The **C++** generator (`GenerateModuleH.js`) and **ObjC** generator (`GenerateModuleObjCpp`) emit it since v0.87. The **Java** and **JNI** generators emit it since v0.88 (`com.facebook.react.bridge.ArrayBuffer`, JNI signature `Lcom/facebook/react/bridge/ArrayBuffer;`). The C++ fixture ships a `getArrayBuffer` / `voidArrayBuffer` sample in the snapshot tests.[^15] One shared guard, `throwIfUnsupportedPromiseArrayBuffer`, rejects `Promise<ArrayBuffer>` on Java and ObjC. `ArrayBuffer` as an argument or as a synchronous return value works on every platform.[^16] On the ObjC side, the generated type is `NSMutableData *` on v0.87.0 and v0.88.1, and `RCTArrayBuffer *` on main after v0.88.1. The 0.88 changelog records a revert of the `RCTArrayBuffer` change on the 0.88 line. Discovery also got fixes after 0.87: the crawler skips `node_modules` and symlinks when it searches for components (`39751d864dd`), and it reads `react-native.config.cjs` so ESM projects are no longer skipped silently (`583c8f3afb2`). Separately, pure-C++ TurboModules no longer require `includesGeneratedCode: true` in `codegenConfig` for Android autolinking to pick them up.[^17]
 
 ## The Benefit: Compile-Time Safety
 
@@ -176,20 +177,20 @@ This automated process is the key to the New Architecture's type safety. By gene
 
 **Citations:**
 
-[^1]: `packages/react-native-codegen/` (RN HEAD `ca750feefb1`).
+[^1]: `packages/react-native-codegen/` (RN HEAD `9c7b0f5fafd`).
 [^2]: "Using Codegen". React Native Documentation. [https://reactnative.dev/docs/the-new-architecture/using-codegen](https://reactnative.dev/docs/the-new-architecture/using-codegen).
 [^3]: `packages/react-native-codegen/package.json` (`"name": "@react-native/codegen"`, current version `0.87.0-main`).
 [^4]: `packages/react-native/scripts/cocoapods/codegen.rb:9-39` (the `run_codegen!` Ruby helper invoked by `use_react_native_codegen_discovery!`); `packages/react-native/scripts/codegen/generate-artifacts-executor/` (cross-platform driver).
-[^5]: `packages/react-native-codegen/src/cli/combine/combine-js-to-schema.js:24-57` (`combineSchemas` filters files via `/extends TurboModule/` or `/export\s+default\s+\(?codegenNativeComponent</`).
-[^6]: `packages/react-native-codegen/src/CodegenSchema.d.ts:12-16` (`interface SchemaType`); `packages/react-native-codegen/src/CodegenSchema.js` (Flow twin).
-[^7]: `packages/react-native-codegen/src/SchemaValidator.js:14-22` (`function getErrors(schema: SchemaType)`).
-[^8]: `packages/react-native-codegen/src/generators/RNCodegen.js:155-181` (the `GENERATORS` map: `modulesIOS: [generateModuleObjCpp.generate]`, `modulesAndroid: [generateModuleJniCpp.generate, generateModuleJniH.generate, generateModuleJavaSpec.generate]`, `modulesCxx: [generateModuleH.generate]`).
-[^9]: Prefer `import { TurboModuleRegistry } from 'react-native'` / `import type { TurboModule } from 'react-native'` under the Strict TypeScript API. The deep module still implements `get` / `getEnforcing` as named exports (`Libraries/TurboModule/TurboModuleRegistry.js:35,39`); the package re-exports them as a namespace via `types/index.d.ts` (`export * as TurboModuleRegistry`).
-[^10]: `packages/react-native-codegen/src/parsers/parsers-commons.js:461-467` (calls `throwIfModuleTypeIsUnsupported`); `packages/react-native-codegen/src/parsers/error-utils.js:199-215` (the check); `packages/react-native-codegen/src/parsers/errors.js:114-128` (`UnsupportedModulePropertyParserError`, message: "interfaces extending TurboModule must only contain 'FunctionTypeAnnotation's or non nullable 'EventEmitter's").
-[^11]: `packages/react-native/src/private/specs_DEPRECATED/modules/NativeSampleTurboModule.js:39-43` (`readonly getConstants: () => { const1: boolean, const2: number, const3: string }`).
-[^12]: `packages/react-native-codegen/src/generators/modules/GenerateModuleObjCpp/index.js:25-59` (`ModuleDeclarationTemplate`). Real snapshot output for a methods-bearing module: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleHObjCpp-test.js.snap:800-832` (`@protocol NativeCameraRollManagerSpec` + `NativeCameraRollManagerSpecJSI : public ObjCTurboModule`).
+[^5]: `packages/react-native-codegen/src/cli/combine/combine-js-to-schema.js:24-35` (`combineSchemas` filters files via `/extends TurboModule/` or `/export\s+default\s+\(?codegenNativeComponent</`).
+[^6]: `packages/react-native-codegen/src/CodegenSchema.d.ts:12` (`interface SchemaType`); `packages/react-native-codegen/src/CodegenSchema.js` (Flow twin).
+[^7]: `packages/react-native-codegen/src/SchemaValidator.js:17` (`function getErrors(schema: SchemaType)`).
+[^8]: `packages/react-native-codegen/src/generators/RNCodegen.js:125-181` (the `LIBRARY_GENERATORS` map: `modulesIOS: [generateModuleObjCpp.generate]`, `modulesAndroid: [generateModuleJniCpp.generate, generateModuleJniH.generate, generateModuleJavaSpec.generate]`, `modulesCxx: [generateModuleH.generate]`).
+[^9]: Prefer `import { TurboModuleRegistry } from 'react-native'` / `import type { TurboModule } from 'react-native'` under the Strict TypeScript API. The deep module still implements `get` / `getEnforcing` as named exports (`Libraries/TurboModule/TurboModuleRegistry.js:35,39`). The public type surface is `ReactNativeApi.d.ts`, which declares `namespace TurboModuleRegistry { export { get_2 as get, getEnforcing } }` (line 5406).
+[^10]: `packages/react-native-codegen/src/parsers/parsers-commons.js:462` (calls `throwIfModuleTypeIsUnsupported`); `packages/react-native-codegen/src/parsers/error-utils.js:219` (the check); `packages/react-native-codegen/src/parsers/errors.js:129` (`UnsupportedModulePropertyParserError`, message at line 140: "interfaces extending TurboModule must only contain 'FunctionTypeAnnotation's or non nullable 'EventEmitter's").
+[^11]: `packages/rn-tester/js/examples/TurboModule/NativeSampleTurboModule.js` (moved out of `src/private/specs_DEPRECATED/modules/` by `4ffc4a65231`; `readonly getConstants: () => { const1: boolean, const2: number, const3: string }`).
+[^12]: `packages/react-native-codegen/src/generators/modules/GenerateModuleObjCpp/index.js:25` (`ModuleDeclarationTemplate`). Real snapshot output for a methods-bearing module: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleHObjCpp-test.js.snap:800-832` (`@protocol NativeCameraRollManagerSpec` + `NativeCameraRollManagerSpecJSI : public ObjCTurboModule`).
 [^13]: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleMm-test.js.snap:130-181` (the `.mm` source registers each method with `methodMap_["name"] = MethodMetadata{argCount, __hostFunction_..._name}` and the static thunks call `invokeObjCMethod(rt, Kind, "name", @selector(...), args, count)`).
-[^14]: `packages/react-native-codegen/src/generators/modules/GenerateModuleH.js:159-196` (`ModuleSpecClassDeclarationTemplate`). Real snapshot: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleH-test.js.snap:43-105` (the `array_buffer_native_module` fixture).
+[^14]: `packages/react-native-codegen/src/generators/modules/GenerateModuleH.js:160` (`ModuleSpecClassDeclarationTemplate`). Real snapshot: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleH-test.js.snap:43-105` (the `array_buffer_native_module` fixture).
 [^15]: `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleH-test.js.snap:74-78` (`static_assert(bridging::getParameterCount(&T::getArrayBuffer) == 1, "Expected getArrayBuffer(...) to have 1 parameters");`).
-[^16]: `GenerateModuleJavaSpec.js` / `GenerateModuleJniCpp.js` throw on `ArrayBufferTypeAnnotation` with "ArrayBuffer is only supported for C++ TurboModules." ObjC emits `ArrayBufferKind` via `GenerateModuleObjCpp/serializeMethod.js`. Schema type: `CodegenSchema.js` `ArrayBufferTypeAnnotation`.
-[^17]: CHANGELOG v0.87.0-rc.0 Fixed: "Fix pure C++ turbo modules not working without `includesGeneratedCode: true`" (`c789880517`).
+[^16]: `packages/react-native-codegen/src/generators/modules/Utils.js:95` (`throwIfUnsupportedPromiseArrayBuffer`, rejects `Promise<ArrayBuffer>`). Java maps the type in `GenerateModuleJavaSpec.js:284,381`, JNI in `GenerateModuleJniCpp.js:313,399`. The Java class is `ReactAndroid/.../bridge/ArrayBuffer.kt` (CHANGELOG v0.88.0). ObjC emits `ArrayBufferKind` and `RCTArrayBuffer *` on main via `GenerateModuleObjCpp/serializeMethod.js:230,401` (`11f9a7f4491`). At `v0.88.1` those lines emit `NSMutableData *`. Schema type: `CodegenSchema.d.ts:49` `ArrayBufferTypeAnnotation`. The old text "ArrayBuffer is only supported for C++ TurboModules" is gone from the generators.
+[^17]: CHANGELOG v0.87.0 Fixed: "Fix pure C++ turbo modules not working without `includesGeneratedCode: true`" (`c789880517`).

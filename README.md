@@ -1,24 +1,24 @@
 > [!NOTE] 
-> Last update: RN v0.87.0-rc.3 2026-07-28
+> Last update: RN v0.88.1 (main `9c7b0f5fafd`) 2026-10-29
 
 # Comprehensive Research on the React Native New Architecture
 
 > A deep-dive research report on the React Native New Architecture, covering core concepts, practical guides, real-world case studies, and more.
 
-This document serves as the central hub for a detailed, 16-chapter report on the significant evolution in the React Native framework. The research is conducted by analyzing the official React Native repository, authoritative documentation, and real-world libraries to provide a comprehensive and up-to-date understanding of the new architecture.
+This document serves as the central hub for a detailed, 18-chapter report on the significant evolution in the React Native framework. The research is conducted by analyzing the official React Native repository, authoritative documentation, and real-world libraries to provide a comprehensive and up-to-date understanding of the new architecture.
 
 **Status:** verified against React Native `main` at commit
-[`ca750feefb1`](https://github.com/facebook/react-native/commit/ca750feefb1f6f6cc7ac151825c76db6fc9dc66e)
-(v0.87.0-rc.3 era, refresh 2026-07-28; previous audit was v0.86.0-rc.1).
-Delta since `v0.86.0-rc.2` covers the remainder of the 0.86 stable line
-(`v0.86.0`…`v0.86.2`) and the 0.87 RC train through `v0.87.0-rc.3`.
+[`9c7b0f5fafd`](https://github.com/facebook/react-native/commit/9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176)
+(v0.88.1 era, refresh 2026-10-29; previous refresh was v0.87.0-rc.3).
+Delta since `ca750feefb1` covers `v0.87.0`, `v0.87.1`, the 0.88 RC train,
+`v0.88.0`, `v0.88.1`, and 795 commits on `main` after `v0.88.1`.
 See [`CHANGELOG.md`](./CHANGELOG.md) for the full delta and each
 chapter's YAML frontmatter `taillog` for per-chapter history.
 
 This documentation has been thoroughly updated to reflect the current
 state of the New Architecture, which is now enabled by default, **cannot
 be opted out of** on RN ≥ 0.82, and continues to hard-wire TurboModules
-and delete legacy Bridge / interop surfaces on the v0.87 line.[^1]
+and delete legacy Bridge / interop surfaces on the v0.87 and v0.88 lines.[^1]
 
 Tip: Many chapters now include Mermaid diagrams (rendered on GitHub) to
 visualize the Bridge vs JSI call paths, Fabric's render pipeline,
@@ -68,6 +68,10 @@ TurboModule CodeGen, Bridgeless interop, and the migration flow.
     *   A hands-on tutorial building a simple Fabric component and TurboModule from scratch.
 *   [Chapter 16: Additional Resources and Checklists](./15-Additional-Resources-and-Checklists.md)
     *   A collection of useful checklists and resources for migration and development.
+*   [Chapter 17: Top 27 React Native Interview Questions](./16-Interview-Questions.md)
+    *   Short spoken answers, key points, common wrong answers, and follow-ups. Each fact has a source footnote.
+*   [Chapter 18: Testing React Native Apps](./17-Testing-React-Native-Apps.md)
+    *   Jest and Testing Library, Detox, Maestro and Appium, test history, device clouds and CI, and agentic AI with MCP servers.
 
 ---
 
@@ -75,8 +79,8 @@ TurboModule CodeGen, Bridgeless interop, and the migration flow.
 
 This book is versioned against the React Native version it is
 **verified against**, not against an internal version. The current
-verified-against version is `v0.87.0-rc.3+main` (RN `main` HEAD
-`ca750feefb1` as of 2026-07-28). See [`CHANGELOG.md`](./CHANGELOG.md)
+verified-against version is `v0.88.1+main` (RN `main` HEAD
+`9c7b0f5fafd` as of 2026-10-29). See [`CHANGELOG.md`](./CHANGELOG.md)
 for the per-version delta.
 
 
@@ -91,4 +95,4 @@ descriptions should follow that bar.
 
 ## Footnotes
 
-[^1]: The New Architecture is hard-wired on in the current React Native source. On iOS, `NewArchitectureHelper.new_arch_enabled` in `packages/react-native/scripts/cocoapods/new_architecture.rb` returns `true` unconditionally. On Android, `ProjectUtils.isNewArchEnabled()` always returns `true`, and the Gradle plugin at `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt` rejects `newArchEnabled=false` (unsupported since React Native 0.82). TurboModules are likewise always on: `RCTTurboModuleEnabled()` returns `YES` (`RCTBridge.mm`) and the `useTurboModules` feature flag was removed in v0.87.0-rc.0. The default was originally flipped for new apps in v0.76.0 (2024-10-23).
+[^1]: The New Architecture is hard-wired on in the current React Native source. On iOS, `NewArchitectureHelper.new_arch_enabled` in `packages/react-native/scripts/cocoapods/new_architecture.rb` returns `true` unconditionally. On Android, `ProjectUtils.isNewArchEnabled()` always returns `true`, and the Gradle plugin at `packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactRootProjectPlugin.kt` rejects `newArchEnabled=false` (unsupported since React Native 0.82). TurboModules are likewise always on: the `useTurboModules` feature flag was removed in v0.87.0-rc.0. `RCTTurboModuleEnabled()` still exists in v0.88.1 and returns `YES` (`RCTBridge.mm`). Commit `01d55273bcf` deletes it on `main`. The default was originally flipped for new apps in v0.76.0 (2024-10-23).

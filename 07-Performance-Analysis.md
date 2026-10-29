@@ -2,18 +2,18 @@
 title: "Performance analysis"
 chapter: "07"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable. Main is 795 commits past it."
 tags: [react-native, new-architecture, performance, jsi, fabric, turbomodules, runtimescheduler, bridgeless]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:11:53-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Tightened lazy-module wording, corrected React-version references (RN now ships React 19.2.3), added a caveat block over the unsourced 2025 benchmark numbers, fixed two broken citation URLs, and added footnotes pointing at the relevant RN source files. See _verification/chapters/07-performance/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). React peer dependency is now ^19.3.0 (reconciler 19.3.0). Added 0.88 Java ArrayBuffer TurboModule note. RCTCxxBridge.mm is gone since 0.87, so the citation is pinned to v0.86.3. Fixed shifted line numbers."
 ---
 
 # Chapter 8: Performance Analysis
@@ -32,7 +33,7 @@ The primary motivation for the New Architecture was to address the performance b
 
 **Updated Analysis (2025):** With the New Architecture now being the default in React Native 0.76+, we have extensive real-world performance data from production applications. The results consistently show significant improvements across all major performance metrics.
 
-> **Status as of v0.87 (2026 refresh).** At the current upstream HEAD (`ca750feefb1`, post `v0.87.0-rc.3`), React Native's peer dependency on React is still `^19.2.3`[^src-react-version]. The "React 18 concurrent features" framing below is still substantively correct, since React 19 is a superset of 18's concurrency model, but the specific reconciler version that ships in the box today is React 19. Two New-Arch-adjacent performance tracks landed on the 0.87 line and are worth calling out separately: (1) TurboModules bridge `ArrayBuffer` on the **C++ and ObjC** paths (Java/JNI CodeGen still rejects it); (2) a shared C++ Native Animated backend (`cxxNativeAnimatedEnabled`) is enabled on the canary feature-flag stage (`expectedReleaseValue: true`, stable default still `false` — a CHANGELOG "flip default to true" entry was later walked back in Defaults) and is driven from Fabric's frame callback, cutting JS↔native chatter for native-driven animations.
+> **Status as of v0.88 (2026-10 refresh).** At the current upstream HEAD (`9c7b0f5fafd`, 795 commits after `v0.88.1`), React Native's peer dependency on React is `^19.3.0`[^src-react-version]. The "React 18 concurrent features" framing below is still substantively correct, since React 19 is a superset of 18's concurrency model, but the specific reconciler version that ships in the box today is React 19. Two New-Arch-adjacent performance tracks landed on the 0.87 and 0.88 lines and are worth calling out separately: (1) TurboModules bridge `ArrayBuffer` on the **C++ and ObjC** paths since 0.87, and the 0.88 changelog adds a Java `ArrayBuffer` type for TurboModules with an explicit byte-ownership contract (borrowed bytes are valid only during the synchronous call)[^src-changelog-ab]; (2) a shared C++ Native Animated backend (`cxxNativeAnimatedEnabled`) is enabled on the canary feature-flag stage (`expectedReleaseValue: true`, stable default still `false` — a CHANGELOG "flip default to true" entry was later walked back in Defaults) and is driven from Fabric's frame callback, cutting JS↔native chatter for native-driven animations.
 
 ## Visual: Call Overhead — Bridge vs JSI (Conceptual)
 
@@ -67,7 +68,7 @@ Interestingly, Meta's official position upon the rollout was that their internal
 
 **Conclusion:** Startup time is significantly improved.
 
-This is one of the clearest and most universally reported benefits. In the legacy architecture, every native module class registered with the bridge had an `RCTModuleData` wrapper created eagerly at bridge startup, and any module declaring `+requiresMainQueueSetup` (or pre-instantiated by the host app) was constructed on the main thread before JS ran[^src-rctcxxbridge]. The New Architecture introduces **lazy loading** for TurboModules[^2].
+This is one of the clearest and most universally reported benefits. In the legacy architecture (iOS source removed from main in 0.87, see the footnote), every native module class registered with the bridge had an `RCTModuleData` wrapper created eagerly at bridge startup, and any module declaring `+requiresMainQueueSetup` (or pre-instantiated by the host app) was constructed on the main thread before JS ran[^src-rctcxxbridge]. The New Architecture introduces **lazy loading** for TurboModules[^2].
 
 -   **Mechanism:** A TurboModule is not instantiated until the first time it is accessed from JavaScript. The C++ `TurboModuleBinding::getModule` resolves the module by name through the platform delegate on demand, and the per-property `jsRepresentation` is also populated lazily on first access[^src-tm-binding]. On iOS and Android the platform `TurboModuleManager` caches the instance after construction, so subsequent calls hit a `ModuleHolder` cache[^src-tm-platform]. Modules that genuinely must run at startup can opt in via `getEagerInitModuleNames`. For an app with dozens of native modules, skipping wholesale registration plus deferring constructor work avoids a large amount of upfront work, leading to a noticeably faster startup time until the first screen is interactive[^2].
 -   **Other startup wins:** Bridgeless mode removes the legacy bridge thread setup and JSON message-queue plumbing entirely[^src-bridgeless], and Fabric component registration is similarly demand-driven. Both contribute to the cold-start improvement alongside lazy TurboModules.
@@ -95,7 +96,7 @@ This is a direct result of replacing the asynchronous, JSON-serializing Bridge w
 
 The New Architecture is what makes React's concurrent rendering reachable on mobile. The mechanism is a C++ `RuntimeScheduler` whose five priority tiers (`Immediate`, `UserBlocking`, `Normal`, `Low`, `Idle`) match the React scheduler one-for-one, with expiration timeouts of 0 ms, 250 ms, 5 s, 10 s, and 5 min respectively[^src-scheduler-prio]. The scheduler implements the HTML event-loop processing model: each task runs to completion, the microtask queue drains, then the rendering update is flushed atomically to the host platform[^src-event-loop]. That atomicity is what lets `useTransition` mark a state update as interruptible without tearing the screen.
 
-(The original draft of this section called these "React 18 concurrent features". At HEAD, RN's peer dependency is `react ^19.2.3` and the bundled Fabric reconciler reports `reconcilerVersion: "19.2.3"`[^src-react-version]. The capability set is the same superset; only the version label needed updating.)
+(The original draft of this section called these "React 18 concurrent features". At HEAD, RN's peer dependency is `react ^19.3.0` and the bundled Fabric reconciler reports `reconcilerVersion: "19.3.0"`[^src-react-version]. The capability set is the same superset; only the version label needed updating.)
 
 ### Automatic Batching Performance
 
@@ -167,15 +168,16 @@ The data shows that for the vast majority of real-world applications, migrating 
 [^6]: Medium, "React Native New Architecture: JSI". [https://medium.com/@elbahjat.abdel/react-native-new-architecture-jsi-c-api-for-js-975a71743c32](https://medium.com/@elbahjat.abdel/react-native-new-architecture-jsi-c-api-for-js-975a71743c32)
 [^7]: Reddit, "50x performance increase for bcrypt hashing". [https://www.reddit.com/r/reactnative/comments/13p2n3j/50x_performance_increase_for_bcrypt_hashing_by/](https://www.reddit.com/r/reactnative/comments/13p2n3j/50x_performance_increase_for_bcrypt_hashing_by/)
 
-**Source-grounded references** (RN commit `ca750feefb1`, 0.87 era):
+**Source-grounded references** (RN commit `9c7b0f5fafd`, v0.88.1 era):
 
-[^src-rctcxxbridge]: `packages/react-native/React/CxxBridge/RCTCxxBridge.mm:449` ("Initialize all native modules that cannot be loaded lazily") and `RCTCxxBridge.mm:928-940` (the eager-instantiation loop that picks up `hasInstance` and `requiresMainQueueSetup` modules).
-[^src-tm-binding]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModuleBinding.cpp:160-205`. The comment on lines 188-198 spells out the lazy `jsRepresentation` pattern: an empty JS object is returned for the module, and its `__proto__` is the `HostObject` that materializes each property on first lookup via `TurboModule::get`.
+[^src-rctcxxbridge]: **Historical citation.** `RCTCxxBridge.mm` no longer exists at v0.88.1 or on main: commit `86350ab9884` (#56831) removed the legacy iOS bridge code, and the file is gone from v0.87.0 onward. The lines below are from tag `v0.86.3`: `packages/react-native/React/CxxBridge/RCTCxxBridge.mm:448-449` ("Initialize all native modules that cannot be loaded lazily") and `RCTCxxBridge.mm:928-940` (the eager-instantiation loop that picks up `hasInstance` and `requiresMainQueueSetup` modules).
+[^src-tm-binding]: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModuleBinding.cpp:170-205` (`getModule` starts at line 170). The comment on lines 180-190 spells out the lazy `jsRepresentation` pattern: an empty JS object is returned for the module, and its `__proto__` is the `HostObject` that materializes each property on first lookup via `TurboModule::get`.
 [^src-tm-platform]: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/internal/turbomodule/core/TurboModuleManager.kt:183-242` (`getOrCreateModule` with `ModuleHolder` cache and `eagerInitModuleNames` opt-in on line 39); `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModuleManager.mm:512-583` (the same lazy-create-then-cache pattern on iOS).
 [^src-bridgeless]: Bridgeless became the default when New Arch was enabled in 0.76: `CHANGELOG-0.7x.md:2076` ("Make bridgeless the default when the New Arch is enabled"). Without the bridge, there is no `MessageQueueThread` for native-to-JS calls and no JSON method-call parser to set up.
 [^src-methodcall]: `packages/react-native/ReactCommon/cxxreact/MethodCall.cpp:24` declares `parseMethodCalls(folly::dynamic&& jsonData)`. The whole file is now wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH`, which is the build flag that strips it out for New-Arch-only builds.
-[^src-nativetojs]: `packages/react-native/ReactCommon/cxxreact/NativeToJsBridge.cpp:298`. `m_executorMessageQueueThread->runOnQueue(...)` is how every native-to-JS call gets hopped onto the JS thread asynchronously in the legacy bridge.
+[^src-nativetojs]: `packages/react-native/ReactCommon/cxxreact/NativeToJsBridge.cpp:299`. The file is wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH`. `m_executorMessageQueueThread->runOnQueue(...)` is how every native-to-JS call gets hopped onto the JS thread asynchronously in the legacy bridge.
 [^src-jsi-hostobject]: `packages/react-native/ReactCommon/jsi/jsi/jsi.h:222-245`. `class HostObject` exposes `virtual Value get(Runtime&, const PropNameID&)` and `virtual void set(Runtime&, const PropNameID&, const Value&)`, both synchronous and called on whichever thread is currently driving the runtime.
 [^src-scheduler-prio]: `packages/react-native/ReactCommon/react/renderer/runtimescheduler/SchedulerPriorityUtils.h:17-58`. The integer codes 1..5 map to `ImmediatePriority`..`IdlePriority` and the `timeoutForSchedulerPriority` helper assigns the 0 ms / 250 ms / 5 s / 10 s / 5 min expirations cited above.
 [^src-event-loop]: `packages/react-native/ReactCommon/react/renderer/runtimescheduler/__docs__/README.md`. The "Event Loop" doc walks through the four-step tick (select task, run task, drain microtasks, update rendering) and the atomicity guarantee that concurrent React relies on.
-[^src-react-version]: `packages/react-native/package.json:153` (`"react": "^19.2.3"`) and `packages/react-native/Libraries/Renderer/implementations/ReactFabric-prod.js:10498` (`version: "19.2.3"`, `reconcilerVersion: "19.2.3"`).
+[^src-react-version]: `packages/react-native/package.json:145` (`"react": "^19.3.0"`) and `packages/react-native/Libraries/Renderer/implementations/ReactFabric-prod.js:11747-11750` (`version: "19.3.0"`, `reconcilerVersion: "19.3.0"`).
+[^src-changelog-ab]: `CHANGELOG.md` v0.88.0 section, lines 73-75 (Java `ArrayBuffer` for TurboModules) and line 161 (ObjC codegen reverted to `NSMutableData *`).

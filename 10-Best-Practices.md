@@ -2,18 +2,18 @@
 title: "Best practices"
 chapter: "10"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable. Main is 795 commits past it."
 tags: [react-native, new-architecture, best-practices, turbo-modules, fabric, jsi, codegen]
 audit:
   status: "verified"
@@ -24,6 +24,7 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:16:17-04:00 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed two factually wrong bullets (callback support, updateProps framing), tightened the CallInvoker thread-naming, added pure-C++ TurboModule and view-recycle notes, and added source-citation footnotes. See _verification/chapters/10-best-practices/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Re-verified all citations. Fixed shifted line numbers (RCTViewComponentView.mm, RCTComponentViewProtocol.h, BridgelessUIManager.js, TurboModule.h). Updated version note to 0.88.1."
 ---
 
 # Chapter 11: Best Practices
@@ -66,14 +67,14 @@ Adopting the New Architecture effectively involves more than just avoiding mista
 [^1]: "Native Modules" (formerly titled "Turbo Native Modules"). React Native Documentation. [https://reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction)
 [^2]: "Fabric Native Components". React Native Documentation. [https://reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction)
 [^3]: "Native Commands". React Native Documentation. [https://reactnative.dev/docs/next/the-new-architecture/fabric-component-native-commands](https://reactnative.dev/docs/next/the-new-architecture/fabric-component-native-commands)
-[^4]: Interop entry points: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.h` (legacy NM shim), `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` (iOS view-manager shim), and `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/fabric/interop/` (Android counterpart). As of RN HEAD `ca750feefb1` (v0.87.0-rc.3 era) these are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`.
+[^4]: Interop entry points: `packages/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTInteropTurboModule.h` (legacy NM shim), `packages/react-native/ReactCommon/react/renderer/components/legacyviewmanagerinterop/` (iOS view-manager shim), and `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/bridge/interop/InteropModuleRegistry.kt` (Android counterpart, gated by `useFabricInterop()`). As of RN HEAD `9c7b0f5fafd` (v0.88.1 era) these are compile-gated behind `RCT_REMOVE_LEGACY_MODULE_INTEROP` / `RCT_REMOVE_LEGACY_COMPONENT_INTEROP`.
 [^5]: CodeGen module pipeline: `packages/react-native-codegen/src/parsers/parsers-commons.js:328-425` (parsing) and `packages/react-native-codegen/src/generators/modules/GenerateModuleH.js` (generation). Generated specs become abstract C++ base classes that the native implementation `override`s.
 [^6]: Pure C++ TurboModules in RN itself: `packages/react-native/ReactCommon/react/nativemodule/microtasks/NativeMicrotasks.{h,cpp}` and `packages/react-native/ReactCommon/react/nativemodule/idlecallbacks/`. Each one extends a `Native<Name>CxxSpec<Impl>` base generated from the JS spec under `packages/react-native/src/private/webapis/.../specs/`.
 [^7]: `CallInvoker` definition: `packages/react-native/ReactCommon/callinvoker/ReactCommon/CallInvoker.h:27-50`. `invokeAsync(CallFunc&&)` schedules a callback that receives a `jsi::Runtime&` argument, which is the contract for "run me on the JS thread."
-[^8]: `TurboModule` invocation surface: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h:80-86` defines `MethodMetadata::invoker` as `jsi::Value(jsi::Runtime&, TurboModule&, const jsi::Value*, size_t)`, and `TurboModule::create` (lines 116-128) calls it inline from the JS-thread host function.
-[^9]: `PromiseKind` is one of the `TurboModuleMethodValueKind` enum members in the same `TurboModule.h:25-34`. The codegen path for `Promise<T>` lives in `packages/react-native-codegen/src/parsers/parsers-primitives.js:333-388` (`emitPromise`).
+[^8]: `TurboModule` invocation surface: `packages/react-native/ReactCommon/react/nativemodule/core/ReactCommon/TurboModule.h:86` defines `MethodMetadata::invoker` as `jsi::Value(jsi::Runtime&, TurboModule&, const jsi::Value*, size_t)`, and `TurboModule::create` (lines 119-132) calls it inline from the JS-thread host function.
+[^9]: `PromiseKind` is one of the `TurboModuleMethodValueKind` enum members in the same `TurboModule.h:27-36`. The codegen path for `Promise<T>` lives in `packages/react-native-codegen/src/parsers/parsers-primitives.js:333-388` (`emitPromise`).
 [^10]: Current-era TurboModule specs with callback parameters: `packages/react-native/src/private/webapis/microtasks/specs/NativeMicrotasks.js:16` and `packages/react-native/src/private/webapis/idlecallbacks/specs/NativeIdleCallbacks.js:27-30`. Generator emits `jsi::Function` for `FunctionTypeAnnotation` arguments in `packages/react-native-codegen/src/generators/modules/GenerateModuleH.js:126-127`. `packages/react-native/ReactCommon/react/bridging/CallbackWrapper.h` provides the helper for keeping a `jsi::Function` alive across threads.
-[^11]: iOS `updateProps` protocol: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:70-71`. Default no-op impl at `packages/react-native/React/Fabric/Mounting/UIView+ComponentViewProtocol.mm`. The reference manual diff lives in `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:263-340`. Android counterpart: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/fabric/mounting/SurfaceMountingManager.kt:643-682` together with `ReactStylesDiffMap` at `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/uimanager/ReactStylesDiffMap.kt:14-30`.
-[^12]: `prepareForRecycle` in the iOS protocol: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:107-112`. Component views are pooled and reused across mounts, so per-mount state set in `init` will leak across recycled instances unless it is reset here.
-[^13]: Command pipeline: `packages/react-native/Libraries/Utilities/codegenNativeCommands.js:17-31` (JS side), `packages/react-native/Libraries/ReactNative/BridgelessUIManager.js:240-260` (focus/blur dispatched as commands), `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:95-98` (`handleCommand:args:` on the component view).
+[^11]: iOS `updateProps` protocol: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:67-68`. Default no-op impl at `packages/react-native/React/Fabric/Mounting/UIView+ComponentViewProtocol.mm`. The reference manual diff lives in `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:334-360`. Android counterpart: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/fabric/mounting/SurfaceMountingManager.kt:633-682` together with `ReactStylesDiffMap` at `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/uimanager/ReactStylesDiffMap.kt:14-30`.
+[^12]: `prepareForRecycle` in the iOS protocol: `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:105-109`. Component views are pooled and reused across mounts, so per-mount state set in `init` will leak across recycled instances unless it is reset here.
+[^13]: Command pipeline: `packages/react-native/Libraries/Utilities/codegenNativeCommands.js:17-31` (JS side), `packages/react-native/Libraries/ReactNative/BridgelessUIManager.js:285-300` (focus/blur dispatched as commands), `packages/react-native/React/Fabric/Mounting/RCTComponentViewProtocol.h:95` (`handleCommand:args:` on the component view).
 [^14]: Migration convention: `packages/react-native/src/private/specs_DEPRECATED/__docs__/README.md` ("Do not create new specs in this directory. Instead, create them colocated with the rest of the logic in an appropriate directory in `src/private`"). The webapis modules listed in footnote 6 follow this layout end to end.

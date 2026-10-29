@@ -2,18 +2,18 @@
 title: "Tutorial - Building a Native Module and Component"
 chapter: "14"
 created_at: "2025-09-22T15:30:19-04:00"
-updated_at: "2026-07-28T22:15:00-04:00"
+updated_at: "2026-10-29T12:00:00-04:00"
 rn_version_origin:
   version: "0.81.4"
   tag: "v0.81.4"
   date: "2025-09-10"
   note: "Closest stable release at the chapter's original bootstrap date (2025-09-22)."
 rn_version_current:
-  version: "0.87.0-rc.3+main"
-  tag: "v0.87.0-rc.3"
-  commit: "ca750feefb1f6f6cc7ac151825c76db6fc9dc66e"
-  date: "2026-07-28"
-  note: "Upstream RN main HEAD as of the refresh. Includes v0.86.2 stable and v0.87.0-rc.3; past rc.3 by a handful of main commits."
+  version: "0.88.1+main"
+  tag: "v0.88.1"
+  commit: "9c7b0f5fafdaa986bd3dcff7d65c3d8d59861176"
+  date: "2026-10-29"
+  note: "Upstream RN main HEAD as of the refresh. Includes v0.88.1 stable; main is 795 commits past it."
 tags: [react-native, new-architecture, tutorial, turbomodule, fabric, codegen]
 audit:
   status: "verified"
@@ -24,11 +24,12 @@ taillog:
   - "2025-09-22T15:30:19-04:00 | Initial draft (RN 0.81.4 era)"
   - "2026-05-23T16:23:33-0400 | Source-grounded audit pass against RN 0.86 (commit b32a6c9e9db). Fixed iOS Promise method signature (RCTPromiseResolveBlock / RCTPromiseRejectBlock, not facebook::react::Promise<T>), Android base class (BaseReactPackage vs deprecated TurboReactPackage), generated Java spec class name (NativeDeviceInfoModuleSpec, not DeviceInfoSpec), ReactModuleInfo 6-arg ctor, added componentDescriptorProvider and <Name>Cls registration for the iOS Fabric view, added module-name companion object on Android. See _verification/chapters/14-tutorial/report.md."
   - "2026-07-28T22:15:00-04:00 | Refresh against RN main ca750feefb1 (v0.87.0-rc.3 era). Documented TurboModules always-on, legacy interop compile-out gates, ArrayBuffer TurboModule support, Strict TypeScript API default, C++ Native Animated canary, and corrected remaining opt-out claims."
+  - "2026-10-29T12:00:00-04:00 | Refresh against RN main 9c7b0f5fafd (v0.88.1 era). Re-checked every tutorial symbol and path against HEAD. Fixed: RCTImageViewManager.mm no longer exists (legacy-arch code removed in 0.87), moved NativeSampleTurboModule path, RCTPromiseResolveBlock nullability, shifted line numbers in footnotes. Code samples unchanged and still valid."
 ---
 
 # Chapter 15: Tutorial - Building a Native Module and Component
 
-> **Audit note (RN 0.87):** the corrected code below is grounded in current React Native source (`ca750feefb1` era). Prefer public `'react-native'` imports — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/...` imports are restricted. Inline footnotes point at the exact files. The H1 still reads "Chapter 15" to match the book's running numbering, even though the filename starts with `14-`.
+> **Audit note (RN 0.88):** the corrected code below is grounded in current React Native source (`9c7b0f5fafd` era, v0.88.1 stable). Prefer public `'react-native'` imports — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/...` imports are restricted. Inline footnotes point at the exact files. The H1 still reads "Chapter 15" to match the book's running numbering, even though the filename starts with `14-`.
 
 This chapter provides a hands-on, step-by-step tutorial to create a simple React Native library that uses both a TurboModule and a Fabric Component. This will demonstrate how the concepts discussed in previous chapters come together in practice.
 
@@ -150,10 +151,10 @@ RCT_EXPORT_MODULE()
 
 // The codegen-generated protocol declares the Promise-returning method with
 // RCTPromiseResolveBlock / RCTPromiseRejectBlock, NOT C++ Promise types.
-//   typedef void (^RCTPromiseResolveBlock)(id result);
-//   typedef void (^RCTPromiseRejectBlock)(NSString *code,
-//                                         NSString *message,
-//                                         NSError *error);
+//   typedef void (^RCTPromiseResolveBlock)(id _Nullable result);
+//   typedef void (^RCTPromiseRejectBlock)(NSString *_Nullable code,
+//                                         NSString *_Nullable message,
+//                                         NSError *_Nullable error);
 - (void)getDeviceName:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject
 {
@@ -290,7 +291,7 @@ export default codegenNativeComponent<NativeProps>('DeviceInfoView');
 
 ### Step 3.2: The iOS Implementation
 
-In the New Architecture, a Fabric component on iOS is a subclass of `RCTViewComponentView`.[^8] You do **not** need an `RCTViewManager` for a Fabric-only library. The legacy `RCTViewManager` pattern only matters for the Paper renderer; in the RN source you can see this directly because files like `Libraries/Image/RCTImageViewManager.mm` are wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH`.[^9] Fabric discovers third-party component classes through a codegen-generated plugin map (`RCTFabricComponentsProvider` in `RCTFabricComponentsPlugins.mm`) that maps a component name string to a C function returning the class.[^9] Two things you must therefore provide on the view:
+In the New Architecture, a Fabric component on iOS is a subclass of `RCTViewComponentView`.[^8] You do **not** need an `RCTViewManager` for a Fabric-only library. The legacy `RCTViewManager` pattern only matters for the Paper renderer; in the RN source you can see this directly because the legacy view managers were guarded by `#ifndef RCT_REMOVE_LEGACY_ARCH` and, since 0.87, the iOS files that carried that guard (for example `Libraries/Image/RCTImageViewManager.mm`) are deleted from the source tree.[^9] Fabric discovers third-party component classes through a codegen-generated plugin map (`RCTFabricComponentsProvider` in `RCTFabricComponentsPlugins.mm`) that maps a component name string to a C function returning the class.[^9] Two things you must therefore provide on the view:
 
 1. A class method `+ (ComponentDescriptorProvider)componentDescriptorProvider` returning `concreteComponentDescriptorProvider<DeviceInfoViewComponentDescriptor>()`. Without it, Fabric does not know which `ComponentDescriptor` to use for layout/shadow tree construction.
 2. A C function named `<ComponentName>Cls(void)` that returns the view's class. The generated plugin map calls it during component registration.
@@ -485,22 +486,22 @@ export { DeviceInfoModule, DeviceInfoView };
 
 **Citations:**
 
-[^1]: `codegenConfig` schema (fields, `type` values, `jsSrcsDir`): see `packages/react-native/scripts/codegen/generate-artifacts-executor/index.js` and the working fixture at `packages/react-native/scripts/codegen/__fixtures__/test-app/lib/test-library/package.json`. The `type` field accepts `"all" | "modules" | "components"` (see `generateRCTModuleProviders.js:59` and `generateRCTThirdPartyComponents.js:52`). External docs: "Using Codegen", [reactnative.dev/docs/next/the-new-architecture/using-codegen](https://reactnative.dev/docs/next/the-new-architecture/using-codegen). `podspecName` is not a standard field in any RN source path under `packages/`.
+[^1]: `codegenConfig` schema (fields, `type` values, `jsSrcsDir`): see `packages/react-native/scripts/codegen/generate-artifacts-executor/index.js` and the working fixture at `packages/react-native/scripts/codegen/__fixtures__/test-app/lib/test-library/package.json`. The `type` field accepts `"all" | "modules" | "components"` (see `generateRCTModuleProviders.js:59` (`config.type === 'components'`) and `generateRCTThirdPartyComponents.js:52` (`config.type === 'modules'`)). External docs: "Using Codegen", [reactnative.dev/docs/next/the-new-architecture/using-codegen](https://reactnative.dev/docs/next/the-new-architecture/using-codegen). `podspecName` is not a standard field in any RN source path under `packages/`.
 
-[^2]: TurboModule type and registry: `packages/react-native/Libraries/TurboModule/RCTExport.{js,d.ts}` (defines `export interface TurboModule`) and `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.{js,d.ts}` (defines `getEnforcing<T extends TurboModule>(name): T`). Canonical spec example: `packages/react-native/src/private/specs_DEPRECATED/modules/NativeSampleTurboModule.js`. Haste-module-name derivation is the basename of the spec file. External docs: "Turbo Native Modules", [reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction).
+[^2]: TurboModule type and registry: `packages/react-native/Libraries/TurboModule/RCTExport.{js,d.ts}` (defines `export interface TurboModule`) and `packages/react-native/Libraries/TurboModule/TurboModuleRegistry.{js,d.ts}` (defines `getEnforcing<T extends TurboModule>(name): T`). Canonical spec example: `packages/rn-tester/js/examples/TurboModule/NativeSampleTurboModule.js`. Haste-module-name derivation is the basename of the spec file. External docs: "Turbo Native Modules", [reactnative.dev/docs/next/turbo-native-modules-introduction](https://reactnative.dev/docs/next/turbo-native-modules-introduction).
 
-[^3]: `<RCTBridgeModule>`-only public header pattern: `packages/react-native/Libraries/Settings/RCTSettingsManager.h:12` (public) and `RCTSettingsManager.mm:18` (`@interface RCTSettingsManager () <NativeSettingsManagerSpec>` in a class extension).
+[^3]: `<RCTBridgeModule>`-only public header pattern: `packages/react-native/Libraries/Settings/RCTSettingsManager.h:12` (public) and `RCTSettingsManager.mm:17` (`@interface RCTSettingsManager () <NativeSettingsManagerSpec>` in a class extension).
 
-[^4]: Promise codegen for ObjC++: `packages/react-native-codegen/src/generators/modules/GenerateModuleObjCpp/serializeMethod.js:111-115` pushes `{paramName: 'resolve', objCType: 'RCTPromiseResolveBlock'}` and `{paramName: 'reject', objCType: 'RCTPromiseRejectBlock'}` when the return type is a `PromiseTypeAnnotation`. The typedefs live in `packages/react-native/React/Base/RCTBridgeModule.h:42` (`typedef void (^RCTPromiseResolveBlock)(id result);`) and `:49` (`typedef void (^RCTPromiseRejectBlock)(NSString *code, NSString *message, NSError *error);`). The codegen snapshot at `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleHObjCpp-test.js.snap:803-804` shows the generated `@protocol` form.
+[^4]: Promise codegen for ObjC++: `packages/react-native-codegen/src/generators/modules/GenerateModuleObjCpp/serializeMethod.js:120-121` pushes `{paramName: 'resolve', objCType: 'RCTPromiseResolveBlock'}` and `{paramName: 'reject', objCType: 'RCTPromiseRejectBlock'}` when the return type is a `PromiseTypeAnnotation`. The typedefs live in `packages/react-native/React/Base/RCTBridgeModule.h:45` (`typedef void (^RCTPromiseResolveBlock)(id _Nullable result);`) and `:52` (`typedef void (^RCTPromiseRejectBlock)(NSString *_Nullable code, NSString *_Nullable message, NSError *_Nullable error);`). The codegen snapshot at `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleHObjCpp-test.js.snap:882-886` shows the generated `@protocol` form.
 
-[^5]: Generated Android spec class name: `packages/react-native-codegen/src/generators/modules/GenerateModuleJavaSpec.js:570` (`const className = \`${hasteModuleName}Spec\`;`). The generated class also already provides `getName()` returning a static `NAME` constant, confirmed by the snapshot at `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleJavaSpec-test.js.snap:75-85`.
+[^5]: Generated Android spec class name: `packages/react-native-codegen/src/generators/modules/GenerateModuleJavaSpec.js:580` (`const className = \`${hasteModuleName}Spec\`;`). The generated class also already provides `getName()` returning a static `NAME` constant, confirmed by the snapshot at `packages/react-native-codegen/src/generators/modules/__tests__/__snapshots__/GenerateModuleJavaSpec-test.js.snap:26-35`.
 
-[^6]: `TurboReactPackage` deprecation: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/TurboReactPackage.kt:10-14` (`@Deprecated(message = "Use BaseReactPackage instead", replaceWith = ReplaceWith("BaseReactPackage"))`). The replacement landed in the v0.76 cycle: see `CHANGELOG-0.7x.md:1262` ("turbomodules: Replace TurboReactPackage with BaseReactPackage", commit `e881a1184c`). RN itself uses `BaseReactPackage` (`packages/react-native/ReactAndroid/src/main/java/com/facebook/react/runtime/CoreReactPackage.kt:48`).
+[^6]: `TurboReactPackage` deprecation: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/TurboReactPackage.kt:10-14` (`@Deprecated(message = "Use BaseReactPackage instead", replaceWith = ReplaceWith(expression = "BaseReactPackage"))`). The replacement landed in the v0.76 cycle: see `CHANGELOG-0.7x.md:1262` ("turbomodules: Replace TurboReactPackage with BaseReactPackage", commit `e881a1184c`). RN itself uses `BaseReactPackage` (`packages/react-native/ReactAndroid/src/main/java/com/facebook/react/runtime/CoreReactPackage.kt:48`).
 
 [^7]: `ReactModuleInfo` constructor evolution: `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/module/model/ReactModuleInfo.kt:16-23` (current 6-arg primary ctor: name, className, canOverrideExistingModule, needsEagerInit, isCxxModule, isTurboModule). The 7-arg overload at `:24-42` is `@Deprecated`, and the `hasConstants` parameter is `@Suppress("UNUSED_PARAMETER")`-marked so it is silently ignored.
 
-[^8]: `RCTViewComponentView`'s declaration and `updateProps:oldProps:` signature: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h:25` (`@interface RCTViewComponentView : UIView <RCTComponentViewProtocol, RCTTouchableComponentViewProtocol>`) and `:70-71` (`- (void)updateProps:(const facebook::react::Props::Shared &)props oldProps:(const facebook::react::Props::Shared &)oldProps NS_REQUIRES_SUPER;`). `Props::Shared` is defined as `std::shared_ptr<const Props>` at `packages/react-native/ReactCommon/react/renderer/core/Props.h:29`.
+[^8]: `RCTViewComponentView`'s declaration and `updateProps:oldProps:` signature: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h:22` (`@interface RCTViewComponentView : UIView <RCTComponentViewProtocol, RCTTouchableComponentViewProtocol>`) and `:67-68` (`- (void)updateProps:(const facebook::react::Props::Shared &)props oldProps:(const facebook::react::Props::Shared &)oldProps NS_REQUIRES_SUPER;`). `Props::Shared` is defined as `std::shared_ptr<const Props>` at `packages/react-native/ReactCommon/react/renderer/core/Props.h:31`.
 
-[^9]: Fabric iOS component discovery: the legacy `RCTViewManager` files are wrapped in `#ifndef RCT_REMOVE_LEGACY_ARCH` (e.g. `packages/react-native/Libraries/Image/RCTImageViewManager.mm:10` opens the guard, `:115` closes it). Fabric discovery happens through the plugin map at `packages/react-native/React/Fabric/Mounting/ComponentViews/RCTFabricComponentsPlugins.mm:19-43`, which maps a component name to a `<Name>Cls(void)` C function. Real-world example: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:1857-1860` (`Class<RCTComponentViewProtocol> RCTViewCls(void) { return RCTViewComponentView.class; }`). The `+ componentDescriptorProvider` class method is the pattern used by every built-in Fabric view (e.g. `packages/react-native/React/Fabric/Mounting/ComponentViews/Switch/RCTSwitchComponentView.mm:65-68`). External docs: "Fabric Native Components", [reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction).
+[^9]: Fabric iOS component discovery: the legacy `RCTViewManager` base class still ships in `packages/react-native/React/Views/RCTViewManager.h`, but the guarded `RCTImageViewManager.mm` was removed in 0.87 (commit `86350ab9884`, "Remove legacy architecture code guarded by RCT_REMOVE_LEGACY_ARCH from RN iOS"). Fabric discovery happens through the plugin map at `packages/react-native/React/Fabric/Mounting/ComponentViews/RCTFabricComponentsPlugins.mm:19-43`, which maps a component name to a `<Name>Cls(void)` C function. Real-world example: `packages/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm:2059` (`Class<RCTComponentViewProtocol> RCTViewCls(void)` returning `RCTViewComponentView.class`). The `+ componentDescriptorProvider` class method is the pattern used by every built-in Fabric view (e.g. `packages/react-native/React/Fabric/Mounting/ComponentViews/Switch/RCTSwitchComponentView.mm:65`). External docs: "Fabric Native Components", [reactnative.dev/docs/next/fabric-native-components-introduction](https://reactnative.dev/docs/next/fabric-native-components-introduction).
 
-[^10]: Android Fabric component generators: interface package + naming at `packages/react-native-codegen/src/generators/components/__tests__/__snapshots__/GeneratePropsJavaInterface-test.js.snap:14, 21` (`package com.facebook.react.viewmanagers; public interface <Name>ManagerInterface<T extends View> extends ViewManagerWithGeneratedInterface`); delegate at `packages/react-native-codegen/src/generators/components/__tests__/__snapshots__/GeneratePropsJavaDelegate-test.js.snap:14, 24` (`public class <Name>ManagerDelegate<T, U> extends BaseViewManagerDelegate<T, U>`). `SimpleViewManager<T>` itself lives at `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/uimanager/SimpleViewManager.kt:21`.
+[^10]: Android Fabric component generators: interface package + naming at `packages/react-native-codegen/src/generators/components/__tests__/__snapshots__/GeneratePropsJavaInterface-test.js.snap:14, 21` (`package com.facebook.react.viewmanagers; public interface <Name>ManagerInterface<T extends View> extends ViewManagerWithGeneratedInterface`); delegate at `packages/react-native-codegen/src/generators/components/__tests__/__snapshots__/GeneratePropsJavaDelegate-test.js.snap:14, 24` (`public class <Name>ManagerDelegate<T extends View, U extends BaseViewManager<T, ? extends LayoutShadowNode> & <Name>ManagerInterface<T>> extends BaseViewManagerDelegate<T, U>`). `SimpleViewManager<T>` itself lives at `packages/react-native/ReactAndroid/src/main/java/com/facebook/react/uimanager/SimpleViewManager.kt:21`.
