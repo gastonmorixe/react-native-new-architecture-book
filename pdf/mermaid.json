@@ -1,0 +1,6 @@
+{
+  "fontFamily": "Helvetica, Arial, sans-serif",
+  "themeVariables": { "fontFamily": "Helvetica, Arial, sans-serif", "fontSize": "16px" },
+  "flowchart": { "htmlLabels": false, "padding": 18, "nodeSpacing": 40, "rankSpacing": 50, "wrappingWidth": 260 },
+  "sequence": { "useMaxWidth": false, "actorMargin": 60, "width": 190, "wrap": false }
+}
