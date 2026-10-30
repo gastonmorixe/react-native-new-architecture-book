@@ -2,6 +2,10 @@
 
 Builds one PDF of the whole book with `markdown-to-pdf.sh` (pandoc + typst).
 
+From the repo root, `make pdf` is the short form. Run `make` to see all
+targets and options (`OUT`, `TOC_DEPTH`, `MERMAID=0`, `MD2PDF`). The direct
+commands are:
+
     uv run pdf/build_book.py                # pdf/dist/react-native-new-architecture-book_rn-v<ver>_<commit>_<YYYYMMDD-HHMMSS>.pdf
     uv run pdf/build_book.py --md-only      # only pdf/build/book.md
     uv run pdf/build_book.py --no-mermaid   # skip diagram rendering
