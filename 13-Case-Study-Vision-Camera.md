@@ -35,7 +35,7 @@ To understand how the New Architecture meets real-world code, we will analyze `r
 This case study tracks two snapshots:
 
 -   **v4.7.2** (2025-09-02), the last release of the v4 line, contemporary with the original drafting of this book. The deep-dive below is grounded in this version.[^vc-v472]
--   **v5.0.0** (2026-04-16), a full rewrite onto Nitro Modules.[^vc-v500] The 5.x line has moved on since. The current release is **v5.2.4** (2026-10-29), which pins `nitrogen` and `react-native-nitro-modules` to 0.37.0 and lists `react-native-nitro-modules` as an optional peer dependency.[^vc-v524] Chapter 13 covers Nitro in depth, so here we only note what changed and why.
+-   **v5.0.0** (2026-04-16), a full rewrite onto Nitro Modules.[^vc-v500] The 5.x line has moved on since. The current release is **v5.2.4** (2026-10-29), which pins `nitrogen` and `react-native-nitro-modules` to 0.37.0 and lists `react-native-nitro-modules` as an optional peer dependency.[^vc-v524] Chapter 14 covers Nitro in depth, so here we only note what changed and why.
 
 ## What "New Architecture support" actually means in v4
 
@@ -131,7 +131,7 @@ The whole pipeline happens for every frame, with no JSON serialization and no in
 
 V5 (April 2026) is a full rewrite onto **Nitro Modules**, the library author's own framework that competes with TurboModules.[^vc-v500] Roughly 3,000 lines of hand-written JSI/C++ went away, and the public surface moved to Nitro-generated `HybridObject` bindings. The Frame Processor pipeline is now plain Swift and Kotlin sitting behind Nitro specs, and the `FrameHostObject` class no longer exists in the v5 source tree.[^vc-v5frame] The repo also restructured into a monorepo with worklets split into a separate npm package, `react-native-vision-camera-worklets`, that peer-depends on `react-native-worklets` (Software Mansion).[^vc-v5worklets-pkg]
 
-For this book, the v4 case study is still the more instructive one. It shows how a mature library can ship a New-Arch-compatible release without rewriting its module and view layers, while still exploiting JSI for the one piece (`Frame`) where the performance budget actually demands it. Chapter 13 picks up where this leaves off and covers Nitro itself.
+For this book, the v4 case study is still the more instructive one. It shows how a mature library can ship a New-Arch-compatible release without rewriting its module and view layers, while still exploiting JSI for the one piece (`Frame`) where the performance budget actually demands it. Chapter 14 picks up where this leaves off and covers Nitro itself.
 
 ## Conclusion
 

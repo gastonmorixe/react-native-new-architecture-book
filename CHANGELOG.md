@@ -17,6 +17,20 @@ audit produced.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Repo renamed to `gastonmorixe/react-native-new-architecture-book`
+  (was `react-native-new-architecture-research`). README title is now
+  "The React Native New Architecture Book".
+- Chapter files renumbered to start at `01-` (were `00-` to `17-`, now
+  `01-` to `18-`). The file prefix now matches the chapter number in
+  each H1 and in the README table of contents. Chapter text did not
+  change.
+- Chapter 13 (Vision Camera): two "see Chapter 13" cross-references for
+  Nitro now point to Chapter 14.
+
 ## [0.88.1] - 2026-10-29
 
 Source-grounded refresh against React Native `main` at
@@ -79,7 +93,7 @@ parallel against the source. Each chapter `taillog` has the detail.
 
 ### New chapters
 
-- Chapter 17 (`16-Interview-Questions.md`): 27 interview questions in five
+- Chapter 17 (`17-Interview-Questions.md`): 27 interview questions in five
   parts: architecture, runtime and JavaScript, UI and performance, native
   code and ecosystem, and testing. Each answer has a short spoken answer,
   key points, a common wrong answer, a follow-up, and source footnotes.
@@ -87,7 +101,7 @@ parallel against the source. Each chapter `taillog` has the detail.
   Examples: `Platform.OS` branches are removed from the bundle, FlashList
   claims were reworded to match its docs, and the AppState focus and blur
   note was proven.
-- Chapter 18 (`17-Testing-React-Native-Apps.md`): unit and component
+- Chapter 18 (`18-Testing-React-Native-Apps.md`): unit and component
   tests, end-to-end tools, a dated history from 2015 to 2026, device
   clouds and CI, and agentic AI with MCP servers. Proofs run: a Jest and
   Testing Library test, Maestro `check-syntax` on two flows, a CI YAML

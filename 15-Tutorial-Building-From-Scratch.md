@@ -29,7 +29,7 @@ taillog:
 
 # Chapter 15: Tutorial - Building a Native Module and Component
 
-> **Audit note (RN 0.88):** the corrected code below is grounded in current React Native source (`9c7b0f5fafd` era, v0.88.1 stable). Prefer public `'react-native'` imports — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/...` imports are restricted. Inline footnotes point at the exact files. The H1 still reads "Chapter 15" to match the book's running numbering, even though the filename starts with `14-`.
+> **Audit note (RN 0.88):** the corrected code below is grounded in current React Native source (`9c7b0f5fafd` era, v0.88.1 stable). Prefer public `'react-native'` imports — under the Strict TypeScript API (default since 0.87.0-rc.1), deep `Libraries/...` imports are restricted. Inline footnotes point at the exact files.
 
 This chapter provides a hands-on, step-by-step tutorial to create a simple React Native library that uses both a TurboModule and a Fabric Component. This will demonstrate how the concepts discussed in previous chapters come together in practice.
 

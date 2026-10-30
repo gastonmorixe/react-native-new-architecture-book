@@ -886,7 +886,7 @@ instructions: |
 [^iq20-5]: CHANGELOG.md:833 (jest preset package), 832 Node drop line, v0.85.0 Breaking.
 [^iq20-6]: CHANGELOG.md:285 (Node >= 22.13.0), 292 (Strict TypeScript API), 296 (AGP v9), v0.87.0 Breaking. The deep import restriction is CHANGELOG.md:278, same Breaking list.
 [^iq20-7]: CHANGELOG.md:319-321 (v0.87.0), interop gates `RCT_REMOVE_LEGACY_COMPONENT_INTEROP` and `RCT_REMOVE_LEGACY_MODULE_INTEROP`.
-[^iq21-1]: react-native-new-arch-research/17-Testing-React-Native-Apps.md, "Test pyramid and testing trophy" and "Part 2" intro. Opinion, not a measured result.
+[^iq21-1]: [18-Testing-React-Native-Apps.md](./18-Testing-React-Native-Apps.md), "Test pyramid and testing trophy" and "Part 2" intro. Opinion, not a measured result.
 [^iq21-2]: packages/jest-preset/jest-preset.js (preset keys) and jest/setup.js (View and other mocks), RN checkout.
 [^iq21-3]: tmp/refresh/interview/scratch/IQ-TESTING/proof-22.txt, Jest run in Node, 3 passed. No layout engine runs.
 [^iq21-4]: The testing chapter, section "A sensible CI pipeline for an RN app". Team choice, not a rule from a source.
