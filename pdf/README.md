@@ -7,7 +7,10 @@ Builds one PDF of the whole book with `markdown-to-pdf.sh` (pandoc + typst).
     uv run pdf/build_book.py --no-mermaid   # skip diagram rendering
     uv run pdf/build_book.py --out X.pdf --toc-depth 2
 
-Env or flag `MD2PDF` / `--md2pdf` sets the path of `markdown-to-pdf.sh`.
+`markdown-to-pdf.sh` in this folder is a vendored copy of the generator
+(pandoc + typst). The build uses it by default. Env or flag `MD2PDF` /
+`--md2pdf` points to another copy, for example to test a newer version.
+Requires `pandoc`, `typst`, `bun` (for mermaid-cli) and `uv`.
 
 How it works:
 
@@ -24,7 +27,8 @@ How it works:
    rest. The page header shows the chapter (`{h2}`) on the left and the
    current section or subsection (`{h3+}`) on the right. The footer holds
    author, title, RN version, date and page numbers. The `{hN}` tokens need
-   the `markdown-to-pdf.sh` version that supports running headings.
+   the `markdown-to-pdf.sh` version that supports running headings (the
+   vendored copy does).
 
 Mermaid blocks are rendered to PNG (3x) with mermaid-cli (`bunx`) and the Chrome in `puppeteer.json`. Edit that path if Chrome lives elsewhere. A failed diagram stops the build.
 

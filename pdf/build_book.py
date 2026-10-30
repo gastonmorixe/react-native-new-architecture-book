@@ -21,17 +21,15 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
-DEFAULT_MD2PDF = (
-    "~/Projects/ledkeep/ledkeep-web-export/docs/"
-    "selinger-multicurrency-tutorial/markdown-to-pdf.sh"
-)
+# Vendored copy, so the build works from a clean clone. Override with
+# --md2pdf or the MD2PDF env var to test another version of the script.
+DEFAULT_MD2PDF = HERE / "markdown-to-pdf.sh"
 BOOK_TITLE = "React Native New Architecture Book"
 STRICT = True
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
